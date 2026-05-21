@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "foundry-cli"
+version = "0.1.0"
+description = "Foundry CLI - 33 operations across 5 resource clients"
+requires-python = ">=3.11"
+dependencies = [
+    "foundry-platform-python>=2.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "mypy>=1.0",
+    "ruff>=0.4.0",
+    "bandit>=1.7.0",
+]
+
+[project.scripts]
+foundry-datasets = "foundry_cli.datasets.scripts.foundry_datasets_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.coverage.run]
+source = ["foundry_cli"]
+branch = true
+omit = ["tests/*", "**/__pycache__/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "def __repr__",
+]
+
+[tool.coverage.xml]
+output = "coverage.xml"
