@@ -983,12 +983,15 @@ class TestOutputFormatterEmit:
         captured = capsys.readouterr()
         assert json.loads(captured.out.strip()) == {"key": "value"}
 
-    def test_emit_error_writes_to_stdout(self, clean_output_env, capsys):
+    def test_emit_error_writes_to_stderr(self, clean_output_env, capsys):
+        # ADR-004: error output always goes to stderr (not stdout).
         from foundry_cli.common.output_formatter import OutputFormatter
         fmt = OutputFormatter()
         fmt.emit_error({"error": True, "msg": "fail"})
         captured = capsys.readouterr()
-        envelope = json.loads(captured.out.strip())
+        # Error envelope must appear on stderr, not stdout.
+        assert captured.out == ""
+        envelope = json.loads(captured.err.strip())
         assert envelope["error"] is True
 
     def test_emit_to_stderr(self, clean_output_env, capsys):

@@ -237,7 +237,10 @@ class OutputFormatter:
         sys.stdout.flush()
 
     def emit_error(self, error_data: Dict[str, Any]) -> None:
-        """Format and emit error data to stdout.
+        """Format and emit error data to stderr.
+
+        Per ADR-004, error output always goes to stderr (not stdout),
+        keeping the CLI contract of stdout for primary result data only.
 
         Parameters
         ----------
@@ -245,8 +248,8 @@ class OutputFormatter:
             Error envelope dictionary.
         """
         output = self.format_error(error_data)
-        sys.stdout.write(output + "\n")
-        sys.stdout.flush()
+        sys.stderr.write(output + "\n")
+        sys.stderr.flush()
 
     def emit_to_stderr(self, data: Any) -> None:
         """Emit data (e.g. pagination metadata) to stderr as JSON.

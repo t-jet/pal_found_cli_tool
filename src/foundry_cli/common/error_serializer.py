@@ -22,6 +22,7 @@ Exit Code Taxonomy (ADR-001)
 import asyncio
 import json
 import logging
+import os
 import sys
 import traceback
 import uuid
@@ -29,6 +30,12 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Type
 
 logger = logging.getLogger(__name__)
+
+# Environment variable controlling traceback inclusion in error envelopes.
+# When set to a falsy value ("0", "false", "no", "off"), tracebacks are
+# suppressed to avoid leaking file paths / internal structure (OWASP A02).
+ENV_INCLUDE_TRACEBACK = "FOUNDRY_INCLUDE_TRACEBACK"
+DEFAULT_INCLUDE_TRACEBACK = True
 
 
 # ADR-001 Exit code taxonomy
@@ -58,54 +65,109 @@ EXIT_CODE_NAMES = {
 
 
 class _SDKAuthError(Exception):
-    """SDK authentication failure."""
+    """Legacy internal placeholder for SDK authentication failure.
+
+    .. deprecated::
+        Retained only for backwards compatibility in unit tests. Real SDK
+        exception types are mapped dynamically via ``_register_sdk_exceptions``
+        when ``foundry_platform_python`` is importable.
+    """
 
 
 class _SDKValidationError(Exception):
-    """SDK validation failure."""
+    """Legacy internal placeholder for SDK validation failure (deprecated)."""
 
 
 class _SDKNotFoundError(Exception):
-    """SDK resource not found."""
+    """Legacy internal placeholder for SDK resource not found (deprecated)."""
 
 
 class _SDKRateLimitError(Exception):
-    """SDK rate limit exceeded."""
+    """Legacy internal placeholder for SDK rate limit exceeded (deprecated)."""
 
 
 class _SDKConflictError(Exception):
-    """SDK conflict error."""
+    """Legacy internal placeholder for SDK conflict error (deprecated)."""
 
 
 class _SDKNetworkError(Exception):
-    """SDK network error."""
+    """Legacy internal placeholder for SDK network error (deprecated)."""
 
 
-# Map exception classes to ADR-001 exit codes
-_EXCEPTION_TO_EXIT_CODE: Dict[Type[BaseException], int] = {
-    # Auth errors -> code 2
-    _SDKAuthError: EXIT_AUTH,
-    # Validation -> code 1 (UserInputError in ADR-001)
-    _SDKValidationError: EXIT_USER_INPUT,
-    ValueError: EXIT_USER_INPUT,
-    TypeError: EXIT_USER_INPUT,
-    # Permission denied -> code 3
-    PermissionError: EXIT_PERMISSION_DENIED,
-    # Not found -> code 4
-    _SDKNotFoundError: EXIT_NOT_FOUND,
-    FileNotFoundError: EXIT_NOT_FOUND,
-    # Timeout -> code 5
-    TimeoutError: EXIT_TIMEOUT,
-    asyncio.TimeoutError: EXIT_TIMEOUT,
-    # Server errors -> code 6
-    # Rate limit -> code 7
-    _SDKRateLimitError: EXIT_RATE_LIMIT,
-    # Config errors -> code 9
-    ImportError: EXIT_CONFIGURATION,
-    ModuleNotFoundError: EXIT_CONFIGURATION,
-    EnvironmentError: EXIT_CONFIGURATION,
-    OSError: EXIT_CONFIGURATION,
-}
+def _register_sdk_exceptions() -> Dict[Type[BaseException], int]:
+    """Build an exit-code map that includes real SDK exceptions if available.
+
+    The foundry-platform-python SDK exposes ``PalantirRPCException`` subclasses
+    via ``foundry_platform_python.errors``. When the SDK is importable, those
+    real exception types are mapped to ADR-001 exit codes so that
+    ``isinstance`` matching in :meth:`ErrorSerializer.serialize` actually fires.
+    When the SDK is not installed (e.g. unit tests, lightweight environments),
+    only the standard library fallbacks are used and HTTP status code
+    classification (see :meth:`ErrorSerializer._classify_http_exception`) acts
+    as the primary mapping path.
+
+    Returns
+    -------
+    Dict[Type[BaseException], int]
+        Mapping of exception classes to ADR-001 exit codes.
+    """
+    mapping: Dict[Type[BaseException], int] = {
+        # Auth errors -> code 2
+        _SDKAuthError: EXIT_AUTH,
+        # Validation -> code 1 (UserInputError in ADR-001)
+        _SDKValidationError: EXIT_USER_INPUT,
+        ValueError: EXIT_USER_INPUT,
+        TypeError: EXIT_USER_INPUT,
+        # Permission denied -> code 3
+        PermissionError: EXIT_PERMISSION_DENIED,
+        # Not found -> code 4
+        _SDKNotFoundError: EXIT_NOT_FOUND,
+        FileNotFoundError: EXIT_NOT_FOUND,
+        # Timeout -> code 5
+        TimeoutError: EXIT_TIMEOUT,
+        asyncio.TimeoutError: EXIT_TIMEOUT,
+        # Rate limit -> code 7
+        _SDKRateLimitError: EXIT_RATE_LIMIT,
+        # Config errors -> code 9
+        ImportError: EXIT_CONFIGURATION,
+        ModuleNotFoundError: EXIT_CONFIGURATION,
+        EnvironmentError: EXIT_CONFIGURATION,
+        OSError: EXIT_CONFIGURATION,
+    }
+
+    # Attempt to register real SDK exception types. This is best-effort: if the
+    # SDK is not importable, HTTP status code classification in
+    # `_classify_http_exception` remains the primary mapping path.
+    try:
+        from foundry_platform_python import errors as _sdk_errors  # type: ignore[import-not-found]
+    except ImportError:
+        return mapping
+
+    sdk_pairs = [
+        ("AuthenticationError", EXIT_AUTH),
+        ("PermissionDeniedError", EXIT_PERMISSION_DENIED),
+        ("NotFoundError", EXIT_NOT_FOUND),
+        ("ValidationError", EXIT_USER_INPUT),
+        ("RateLimitExceeded", EXIT_RATE_LIMIT),
+        ("ServerError", EXIT_SERVER_ERROR),
+        ("ConflictError", EXIT_USER_INPUT),
+        ("NetworkError", EXIT_CONFIGURATION),
+    ]
+    for attr_name, exit_code in sdk_pairs:
+        sdk_exc = getattr(_sdk_errors, attr_name, None)
+        if isinstance(sdk_exc, type) and issubclass(sdk_exc, BaseException):
+            mapping[sdk_exc] = exit_code
+
+    # PalantirRPCException base class itself defaults to general/server error.
+    base = getattr(_sdk_errors, "PalantirRPCException", None)
+    if isinstance(base, type) and issubclass(base, BaseException):
+        mapping.setdefault(base, EXIT_SERVER_ERROR)
+
+    return mapping
+
+
+# Map exception classes to ADR-001 exit codes (computed at import time).
+_EXCEPTION_TO_EXIT_CODE: Dict[Type[BaseException], int] = _register_sdk_exceptions()
 
 
 class ErrorSerializer:
@@ -236,8 +298,22 @@ class ErrorSerializer:
 
         exit_code_name = EXIT_CODE_NAMES.get(exit_code, "UnknownError")
 
-        tb_lines = traceback.format_exception(type(exception), exception, exception.__traceback__)
-        traceback_str = "".join(tb_lines).rstrip()
+        # Traceback inclusion is configurable to mitigate sensitive data
+        # exposure (OWASP A02). Defaults to on for diagnostics; production
+        # deployments can set FOUNDRY_INCLUDE_TRACEBACK=false.
+        include_tb = os.environ.get(ENV_INCLUDE_TRACEBACK, "")
+        if include_tb == "":
+            include_tb_val = DEFAULT_INCLUDE_TRACEBACK
+        else:
+            include_tb_val = include_tb.lower() in ("true", "1", "yes", "on")
+
+        if include_tb_val:
+            tb_lines = traceback.format_exception(
+                type(exception), exception, exception.__traceback__
+            )
+            traceback_str = "".join(tb_lines).rstrip()
+        else:
+            traceback_str = ""
 
         error_envelope: Dict[str, Any] = {
             "error": True,

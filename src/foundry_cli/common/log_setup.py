@@ -24,6 +24,7 @@ import json
 import logging
 import os
 import sys
+import threading
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -105,6 +106,7 @@ class LogSetup:
     """
 
     _configured: bool = False
+    _lock: threading.Lock = threading.Lock()
 
     @classmethod
     def configure(
@@ -112,6 +114,10 @@ class LogSetup:
         log_level: Optional[str] = None,
     ) -> logging.Logger:
         """Configure the root logger with NDJSON formatter to stderr.
+
+        Thread-safe: serialises concurrent first-configurations through a
+        class-level lock so that two threads racing to configure logging do
+        not register duplicate handlers.
 
         Parameters
         ----------
@@ -129,34 +135,40 @@ class LogSetup:
         ValueError
             If log_level is not one of the supported levels.
         """
+        # Fast path: already configured (no lock needed for the read).
         if cls._configured:
             return logging.getLogger()
 
-        # Resolve log level: explicit arg > env var > default
-        effective_level = log_level or os.environ.get(ENV_LOG_LEVEL)
-        if not effective_level:
-            effective_level = DEFAULT_LOG_LEVEL
-        effective_level = effective_level.upper()
+        with cls._lock:
+            # Re-check inside the lock to avoid duplicate configuration.
+            if cls._configured:
+                return logging.getLogger()
 
-        if effective_level not in SUPPORTED_LEVELS:
-            raise ValueError(
-                f"Unsupported log level '{effective_level}'. "
-                f"Must be one of: {', '.join(sorted(SUPPORTED_LEVELS))}"
-            )
+            # Resolve log level: explicit arg > env var > default
+            effective_level = log_level or os.environ.get(ENV_LOG_LEVEL)
+            if not effective_level:
+                effective_level = DEFAULT_LOG_LEVEL
+            effective_level = effective_level.upper()
 
-        root_logger = logging.getLogger()
-        root_logger.setLevel(getattr(logging, effective_level))
+            if effective_level not in SUPPORTED_LEVELS:
+                raise ValueError(
+                    f"Unsupported log level '{effective_level}'. "
+                    f"Must be one of: {', '.join(sorted(SUPPORTED_LEVELS))}"
+                )
 
-        # Remove any existing handlers to prevent duplicates
-        root_logger.handlers.clear()
+            root_logger = logging.getLogger()
+            root_logger.setLevel(getattr(logging, effective_level))
 
-        # Create stderr handler with NDJSON formatter
-        stderr_handler = logging.StreamHandler(sys.stderr)
-        stderr_handler.setFormatter(_NdJsonFormatter())
-        root_logger.addHandler(stderr_handler)
+            # Remove any existing handlers to prevent duplicates
+            root_logger.handlers.clear()
 
-        cls._configured = True
-        return root_logger
+            # Create stderr handler with NDJSON formatter
+            stderr_handler = logging.StreamHandler(sys.stderr)
+            stderr_handler.setFormatter(_NdJsonFormatter())
+            root_logger.addHandler(stderr_handler)
+
+            cls._configured = True
+            return root_logger
 
     @classmethod
     def reset(cls) -> None:
@@ -164,9 +176,10 @@ class LogSetup:
 
         Clears all handlers and resets the configured flag.
         """
-        root_logger = logging.getLogger()
-        root_logger.handlers.clear()
-        cls._configured = False
+        with cls._lock:
+            root_logger = logging.getLogger()
+            root_logger.handlers.clear()
+            cls._configured = False
 
     @staticmethod
     def emit_metadata_separator() -> None:

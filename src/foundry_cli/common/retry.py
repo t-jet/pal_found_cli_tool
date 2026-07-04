@@ -33,8 +33,6 @@ from typing import Any, Callable, Dict, Optional, Set, Tuple, Type, TypeVar, Uni
 
 import requests
 
-from foundry_cli.common.log_setup import LogSetup
-
 logger = logging.getLogger(__name__)
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -111,7 +109,7 @@ def _calculate_delay(
     if jitter:
         # ±10% jitter
         jitter_factor = 1.0 + random.uniform(-0.1, 0.1)
-        delay *= jitter_factor
+        delay = float(delay * jitter_factor)
 
     return delay
 
