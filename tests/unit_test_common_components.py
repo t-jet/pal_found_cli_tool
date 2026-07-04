@@ -8,10 +8,9 @@ Framework: pytest
 Run: pytest tests/unit_test_common_components.py -v --tb=long
 """
 
-import json
 import os
 import sys
-import tempfile
+from enum import Enum
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -39,6 +38,7 @@ from foundry_cli.common.config_loader import (
     DEFAULT_MIN_TIMEOUT_S,
     DEFAULT_MAX_TIMEOUT_S,
     DEFAULT_FORMAT,
+    EXIT_CONFIGURATION,
 )
 from foundry_cli.common.auth_provider import AuthProvider
 from foundry_cli.common.async_client_factory import AsyncClientFactory
@@ -47,14 +47,6 @@ from foundry_cli.common.async_client_factory import AsyncClientFactory
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-@pytest.fixture(autouse=True)
-def reset_factory():
-    """Reset AsyncClientFactory singleton before/after each test."""
-    AsyncClientFactory.reset()
-    yield
-    AsyncClientFactory.reset()
-
 
 @pytest.fixture
 def clean_env(monkeypatch):
@@ -77,7 +69,6 @@ def mock_sdk():
 
     mock_module = MagicMock()
     mock_module.UserTokenAuth = mock_uta
-    mock_module.FoundryClient = mock_fc
     mock_module.AsyncFoundryClient = mock_fc
 
     with patch.dict(sys.modules, {"foundry_sdk": mock_module}):
@@ -336,41 +327,41 @@ class TestConfigLoaderPropertyAccessors:
         cfg = ConfigLoader()
         assert cfg.default_format == "json"
 
-    def test_global_readonly_parses_true_values(self, clean_env, monkeypatch):
+    @pytest.mark.parametrize("val", ["true", "1", "yes", "on", "TRUE", "Yes", "On"])
+    def test_global_readonly_parses_true_values(self, clean_env, monkeypatch, val):
         cfg = ConfigLoader()
-        for val in ("true", "1", "yes"):
-            monkeypatch.setenv(ENV_READONLY, val)
-            assert cfg.global_readonly is True, f"Expected True for '{val}'"
+        monkeypatch.setenv(ENV_READONLY, val)
+        assert cfg.global_readonly is True, f"Expected True for '{val}'"
 
-    def test_global_readonly_parses_false_values(self, clean_env, monkeypatch):
+    @pytest.mark.parametrize("val", ["false", "0", "", "no", "random", "off"])
+    def test_global_readonly_parses_false_values(self, clean_env, monkeypatch, val):
         cfg = ConfigLoader()
-        for val in ("false", "0", "", "no", "random"):
-            monkeypatch.setenv(ENV_READONLY, val)
-            assert cfg.global_readonly is False, f"Expected False for '{val}'"
+        monkeypatch.setenv(ENV_READONLY, val)
+        assert cfg.global_readonly is False, f"Expected False for '{val}'"
 
-    def test_global_metadata_only_parses_true_values(self, clean_env, monkeypatch):
+    @pytest.mark.parametrize("val", ["true", "1", "yes", "on"])
+    def test_global_metadata_only_parses_true_values(self, clean_env, monkeypatch, val):
         cfg = ConfigLoader()
-        for val in ("true", "1", "yes"):
-            monkeypatch.setenv(ENV_METADATA_ONLY, val)
-            assert cfg.global_metadata_only is True, f"Expected True for '{val}'"
+        monkeypatch.setenv(ENV_METADATA_ONLY, val)
+        assert cfg.global_metadata_only is True, f"Expected True for '{val}'"
 
-    def test_global_metadata_only_parses_false_values(self, clean_env, monkeypatch):
+    @pytest.mark.parametrize("val", ["false", "0", "", "off"])
+    def test_global_metadata_only_parses_false_values(self, clean_env, monkeypatch, val):
         cfg = ConfigLoader()
-        for val in ("false", "0", ""):
-            monkeypatch.setenv(ENV_METADATA_ONLY, val)
-            assert cfg.global_metadata_only is False, f"Expected False for '{val}'"
+        monkeypatch.setenv(ENV_METADATA_ONLY, val)
+        assert cfg.global_metadata_only is False, f"Expected False for '{val}'"
 
-    def test_enable_attribution_parses_true_values(self, clean_env, monkeypatch):
+    @pytest.mark.parametrize("val", ["true", "1", "yes", "on"])
+    def test_enable_attribution_parses_true_values(self, clean_env, monkeypatch, val):
         cfg = ConfigLoader()
-        for val in ("true", "1", "yes"):
-            monkeypatch.setenv(ENV_ENABLE_ATTRIBUTION, val)
-            assert cfg.enable_attribution is True, f"Expected True for '{val}'"
+        monkeypatch.setenv(ENV_ENABLE_ATTRIBUTION, val)
+        assert cfg.enable_attribution is True, f"Expected True for '{val}'"
 
-    def test_enable_attribution_parses_false_values(self, clean_env, monkeypatch):
+    @pytest.mark.parametrize("val", ["false", "0", ""])
+    def test_enable_attribution_parses_false_values(self, clean_env, monkeypatch, val):
         cfg = ConfigLoader()
-        for val in ("false", "0", ""):
-            monkeypatch.setenv(ENV_ENABLE_ATTRIBUTION, val)
-            assert cfg.enable_attribution is False, f"Expected False for '{val}'"
+        monkeypatch.setenv(ENV_ENABLE_ATTRIBUTION, val)
+        assert cfg.enable_attribution is False, f"Expected False for '{val}'"
 
     def test_attribution_rids_returns_comma_separated_string(
         self, clean_env, monkeypatch
@@ -383,11 +374,11 @@ class TestConfigLoaderPropertyAccessors:
         cfg = ConfigLoader()
         assert cfg.attribution_rids is None
 
-    def test_enable_tracing_parses_true_values(self, clean_env, monkeypatch):
+    @pytest.mark.parametrize("val", ["true", "1", "yes", "on"])
+    def test_enable_tracing_parses_true_values(self, clean_env, monkeypatch, val):
         cfg = ConfigLoader()
-        for val in ("true", "1", "yes"):
-            monkeypatch.setenv(ENV_ENABLE_TRACING, val)
-            assert cfg.enable_tracing is True, f"Expected True for '{val}'"
+        monkeypatch.setenv(ENV_ENABLE_TRACING, val)
+        assert cfg.enable_tracing is True, f"Expected True for '{val}'"
 
     def test_enable_tracing_default_false(self, clean_env):
         cfg = ConfigLoader()
@@ -403,8 +394,150 @@ class TestConfigLoaderPropertyAccessors:
         assert cfg.loaded_file is None
 
 
+class TestConfigLoaderTypedAccessors:
+    """get_str, get_bool, get_int, get_float, get_enum."""
+
+    def test_get_str_returns_value(self, clean_env, monkeypatch):
+        monkeypatch.setenv("MY_STR", "hello")
+        cfg = ConfigLoader()
+        assert cfg.get_str("MY_STR") == "hello"
+
+    def test_get_str_strips_whitespace(self, clean_env, monkeypatch):
+        monkeypatch.setenv("MY_STR", "  hello  ")
+        cfg = ConfigLoader()
+        assert cfg.get_str("MY_STR") == "hello"
+
+    def test_get_str_returns_none_for_missing(self, clean_env):
+        cfg = ConfigLoader()
+        assert cfg.get_str("NONEXISTENT") is None
+
+    def test_get_str_returns_default_for_missing(self, clean_env):
+        cfg = ConfigLoader()
+        assert cfg.get_str("NONEXISTENT", default="fallback") == "fallback"
+
+    @pytest.mark.parametrize("val", ["true", "1", "yes", "on", "TRUE", "On"])
+    def test_get_bool_true_variants(self, clean_env, monkeypatch, val):
+        monkeypatch.setenv("MY_BOOL", val)
+        cfg = ConfigLoader()
+        assert cfg.get_bool("MY_BOOL") is True, f"Expected True for '{val}'"
+
+    @pytest.mark.parametrize("val", ["false", "0", "no", "off", "", "random"])
+    def test_get_bool_false_variants(self, clean_env, monkeypatch, val):
+        monkeypatch.setenv("MY_BOOL", val)
+        cfg = ConfigLoader()
+        assert cfg.get_bool("MY_BOOL") is False, f"Expected False for '{val}'"
+
+    def test_get_bool_missing_uses_default(self, clean_env):
+        cfg = ConfigLoader()
+        assert cfg.get_bool("MISSING") is False
+        assert cfg.get_bool("MISSING", default=True) is True
+
+    def test_get_bool_strips_whitespace(self, clean_env, monkeypatch):
+        monkeypatch.setenv("MY_BOOL", "  true  ")
+        cfg = ConfigLoader()
+        assert cfg.get_bool("MY_BOOL") is True
+
+    def test_get_int_returns_value(self, clean_env, monkeypatch):
+        monkeypatch.setenv("MY_INT", "42")
+        cfg = ConfigLoader()
+        assert cfg.get_int("MY_INT") == 42
+
+    def test_get_int_strips_whitespace(self, clean_env, monkeypatch):
+        monkeypatch.setenv("MY_INT", "  42  ")
+        cfg = ConfigLoader()
+        assert cfg.get_int("MY_INT") == 42
+
+    def test_get_int_missing_uses_default(self, clean_env):
+        cfg = ConfigLoader()
+        assert cfg.get_int("MISSING") is None
+        assert cfg.get_int("MISSING", default=7) == 7
+
+    def test_get_int_non_numeric_returns_default(self, clean_env, monkeypatch):
+        monkeypatch.setenv("MY_INT", "abc")
+        cfg = ConfigLoader()
+        assert cfg.get_int("MY_INT", default=99) == 99
+
+    def test_get_int_empty_string_returns_default(self, clean_env, monkeypatch):
+        monkeypatch.setenv("MY_INT", "")
+        cfg = ConfigLoader()
+        assert cfg.get_int("MY_INT", default=5) == 5
+
+    def test_get_float_returns_value(self, clean_env, monkeypatch):
+        monkeypatch.setenv("MY_FLOAT", "3.14")
+        cfg = ConfigLoader()
+        assert cfg.get_float("MY_FLOAT") == pytest.approx(3.14)
+
+    def test_get_float_strips_whitespace(self, clean_env, monkeypatch):
+        monkeypatch.setenv("MY_FLOAT", "  3.14  ")
+        cfg = ConfigLoader()
+        assert cfg.get_float("MY_FLOAT") == pytest.approx(3.14)
+
+    def test_get_float_missing_uses_default(self, clean_env):
+        cfg = ConfigLoader()
+        assert cfg.get_float("MISSING") is None
+        assert cfg.get_float("MISSING", default=1.5) == pytest.approx(1.5)
+
+    def test_get_float_non_numeric_returns_default(self, clean_env, monkeypatch):
+        monkeypatch.setenv("MY_FLOAT", "abc")
+        cfg = ConfigLoader()
+        assert cfg.get_float("MY_FLOAT", default=2.0) == pytest.approx(2.0)
+
+    def test_get_enum_by_name(self, clean_env, monkeypatch):
+        class Color(Enum):
+            RED = "red"
+            GREEN = "green"
+
+        monkeypatch.setenv("MY_ENUM", "RED")
+        cfg = ConfigLoader()
+        assert cfg.get_enum("MY_ENUM", Color) is Color.RED
+
+    def test_get_enum_name_case_insensitive(self, clean_env, monkeypatch):
+        class Color(Enum):
+            RED = "red"
+
+        monkeypatch.setenv("MY_ENUM", "red")
+        cfg = ConfigLoader()
+        # Lowercase name "red" still matches member name "RED"
+        assert cfg.get_enum("MY_ENUM", Color) is Color.RED
+
+    def test_get_enum_by_value(self, clean_env, monkeypatch):
+        """Value-match path: env string equals a member value (not a name)."""
+        class Mode(Enum):
+            FAST = "speed"
+            SLOW = "turtle"
+
+        # "turtle" is not a member name, so name-match fails and value-match wins
+        monkeypatch.setenv("MY_ENUM", "turtle")
+        cfg = ConfigLoader()
+        assert cfg.get_enum("MY_ENUM", Mode) is Mode.SLOW
+
+    def test_get_enum_no_match_returns_default(self, clean_env, monkeypatch):
+        class Color(Enum):
+            RED = "red"
+
+        monkeypatch.setenv("MY_ENUM", "purple")
+        cfg = ConfigLoader()
+        assert cfg.get_enum("MY_ENUM", Color, default=Color.RED) is Color.RED
+
+    def test_get_enum_missing_returns_default(self, clean_env):
+        class Color(Enum):
+            RED = "red"
+
+        cfg = ConfigLoader()
+        assert cfg.get_enum("MISSING", Color) is None
+        assert cfg.get_enum("MISSING", Color, default=Color.RED) is Color.RED
+
+    def test_get_enum_strips_whitespace(self, clean_env, monkeypatch):
+        class Color(Enum):
+            RED = "red"
+
+        monkeypatch.setenv("MY_ENUM", "  RED  ")
+        cfg = ConfigLoader()
+        assert cfg.get_enum("MY_ENUM", Color) is Color.RED
+
+
 class TestConfigLoaderGetEnvHelpers:
-    """get_env() and get_env_bool() helper methods."""
+    """Backward-compatible get_env() and get_env_bool() helpers."""
 
     def test_get_env_returns_value(self, clean_env, monkeypatch):
         monkeypatch.setenv("MY_VAR", "hello")
@@ -554,10 +687,19 @@ class TestAuthProviderValidate:
         assert is_valid is False
         assert err is not None
 
-    def test_validate_whitespace_only_token(self):
+    def test_validate_whitespace_only_token_rejected(self):
+        """Whitespace-only token must NOT pass validation (A1/A4)."""
         is_valid, err = AuthProvider.validate("   ", "https://host")
-        # Whitespace-only is truthy in Python, so it passes validation
-        assert is_valid is True
+        assert is_valid is False
+        assert err is not None
+        assert "FOUNDRY_TOKEN" in err
+
+    def test_validate_whitespace_only_hostname_rejected(self):
+        """Whitespace-only hostname must NOT pass validation (A1/A4)."""
+        is_valid, err = AuthProvider.validate("token", "   ")
+        assert is_valid is False
+        assert err is not None
+        assert "FOUNDRY_HOSTNAME" in err
 
 
 class TestAuthProviderGetAuth:
@@ -567,7 +709,7 @@ class TestAuthProviderGetAuth:
         mock_mod, mock_uta, _ = mock_sdk
         mock_uta.reset_mock()
         mock_uta.return_value = MagicMock()
-        auth = AuthProvider.get_auth("my_token", "https://host")
+        auth = AuthProvider.get_auth("my_token")
         mock_uta.assert_called_once_with("my_token")
         assert auth is not None
 
@@ -575,20 +717,31 @@ class TestAuthProviderGetAuth:
         mock_mod, mock_uta, _ = mock_sdk
         mock_uta.reset_mock()
         mock_uta.return_value = MagicMock()
-        AuthProvider.get_auth("secret_token_123", "https://host")
+        AuthProvider.get_auth("secret_token_123")
         mock_uta.assert_called_once_with("secret_token_123")
+
+    def test_get_auth_takes_only_token_argument(self, mock_sdk):
+        """get_auth signature is get_auth(token) — no dead hostname param (A2)."""
+        import inspect
+        sig = inspect.signature(AuthProvider.get_auth)
+        assert list(sig.parameters) == ["token"]
 
     def test_get_auth_sdk_missing_raises_configuration_error(self):
         with patch.dict(sys.modules, {"foundry_sdk": None}):
             with pytest.raises(ConfigurationError, match="foundry-sdk not installed"):
-                AuthProvider.get_auth("token", "https://host")
+                AuthProvider.get_auth("token")
 
     def test_get_auth_import_error_raises_configuration_error(self):
         """When foundry_sdk raises ImportError, ConfigurationError is raised."""
-        # Simulate ImportError during import
         with patch.dict(sys.modules, {}):
             with pytest.raises(ConfigurationError, match="foundry-sdk not installed"):
-                AuthProvider.get_auth("token", "https://host")
+                AuthProvider.get_auth("token")
+
+    def test_get_auth_has_return_type_annotation(self):
+        """get_auth must declare a return type (A3)."""
+        import inspect
+        sig = inspect.signature(AuthProvider.get_auth)
+        assert sig.return_annotation is not inspect.Signature.empty
 
 
 class TestAuthProviderSecurity:
@@ -598,7 +751,6 @@ class TestAuthProviderSecurity:
         is_valid, err = AuthProvider.validate(None, "https://host")
         # Error should mention the env var name, not the token value
         assert "FOUNDRY_TOKEN" in err
-        # If we had a token value, it should not appear in error
         is_valid2, err2 = AuthProvider.validate(None, None)
         assert "secret" not in err2
 
@@ -625,6 +777,20 @@ class TestAsyncClientFactoryCreate:
         client = factory.create(cfg)
         mock_fc.assert_called_once()
         assert client is not None
+
+    def test_create_uses_async_foundry_client(self, clean_env, monkeypatch, mock_sdk):
+        """create() must instantiate AsyncFoundryClient, not FoundryClient (F1)."""
+        monkeypatch.setenv(ENV_TOKEN, "tok")
+        monkeypatch.setenv(ENV_HOSTNAME, "https://host")
+        cfg = ConfigLoader()
+        cfg.load()
+        mock_mod, mock_uta, mock_fc = mock_sdk
+        factory = AsyncClientFactory()
+        factory.create(cfg)
+        # AsyncFoundryClient was the class invoked
+        mock_fc.assert_called_once()
+        # And it came from the AsyncFoundryClient name on the module
+        assert hasattr(mock_mod, "AsyncFoundryClient")
 
     def test_create_passes_auth_and_hostname(self, clean_env, monkeypatch, mock_sdk):
         """Client created with correct auth and hostname kwargs."""
@@ -687,6 +853,16 @@ class TestAsyncClientFactoryCreate:
         with pytest.raises(ConfigurationError, match="Missing"):
             factory.create(cfg)
 
+    def test_create_whitespace_token_raises(self, clean_env, monkeypatch, mock_sdk):
+        """Whitespace-only token → treated as missing (A1)."""
+        monkeypatch.setenv(ENV_TOKEN, "   ")
+        monkeypatch.setenv(ENV_HOSTNAME, "https://host")
+        cfg = ConfigLoader()
+        cfg.load()
+        factory = AsyncClientFactory()
+        with pytest.raises(ConfigurationError, match="Missing"):
+            factory.create(cfg)
+
     def test_create_sdk_missing_raises(self, clean_env, monkeypatch):
         """foundry_sdk not installed → ConfigurationError."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
@@ -697,6 +873,12 @@ class TestAsyncClientFactoryCreate:
             factory = AsyncClientFactory()
             with pytest.raises(ConfigurationError, match="foundry-sdk not installed"):
                 factory.create(cfg)
+
+    def test_create_has_return_type_annotation(self):
+        """create() must declare a return type (F4)."""
+        import inspect
+        sig = inspect.signature(AsyncClientFactory.create)
+        assert sig.return_annotation is not inspect.Signature.empty
 
 
 class TestAsyncClientFactoryAttribution:
@@ -759,8 +941,8 @@ class TestAsyncClientFactoryAttribution:
         call_kwargs = mock_fc.call_args[1]
         assert call_kwargs["attribution_rids"] == ["single-rid"]
 
-    def test_create_attribution_rids_with_whitespace(self, clean_env, monkeypatch, mock_sdk):
-        """Attribution RIDs with spaces → split preserves whitespace."""
+    def test_create_attribution_rids_strips_whitespace(self, clean_env, monkeypatch, mock_sdk):
+        """Attribution RIDs with surrounding whitespace are stripped (F5)."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
         monkeypatch.setenv(ENV_HOSTNAME, "https://host")
         monkeypatch.setenv(ENV_ENABLE_ATTRIBUTION, "true")
@@ -771,19 +953,19 @@ class TestAsyncClientFactoryAttribution:
         factory = AsyncClientFactory()
         factory.create(cfg)
         call_kwargs = mock_fc.call_args[1]
-        # split(",") preserves whitespace in values
-        assert len(call_kwargs["attribution_rids"]) == 3
+        assert call_kwargs["attribution_rids"] == ["rid1", "rid2", "rid3"]
 
 
-class TestAsyncClientFactoryCache:
-    """AsyncClientFactory — caching, get(), reset()."""
+class TestAsyncClientFactoryStatelessness:
+    """AsyncClientFactory — stateless per invocation (no singleton, F2/F3)."""
 
-    def test_get_returns_none_before_create(self):
-        factory = AsyncClientFactory()
-        assert factory.get() is None
+    def test_factory_has_no_class_level_instance_state(self):
+        """No _instance class variable that caches across factory instances (F2)."""
+        # The class itself must not expose a mutable singleton attribute
+        assert not hasattr(AsyncClientFactory, "_instance")
 
-    def test_get_returns_cached_client(self, clean_env, monkeypatch, mock_sdk):
-        """After create(), get() returns the same instance."""
+    def test_create_returns_fresh_instance_each_call(self, clean_env, monkeypatch, mock_sdk):
+        """Each create() returns a distinct client; no caching across calls."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
         monkeypatch.setenv(ENV_HOSTNAME, "https://host")
         cfg = ConfigLoader()
@@ -791,40 +973,42 @@ class TestAsyncClientFactoryCache:
         mock_mod, mock_uta, mock_fc = mock_sdk
         factory = AsyncClientFactory()
         client1 = factory.create(cfg)
-        client2 = factory.get()
-        assert client1 is client2
+        client2 = factory.create(cfg)
+        # Two construction calls = two distinct clients
+        assert mock_fc.call_count == 2
 
-    def test_reset_clears_cache(self, clean_env, monkeypatch, mock_sdk):
-        """After reset(), get() returns None."""
+    def test_two_factory_instances_are_independent(self, clean_env, monkeypatch, mock_sdk):
+        """Separate factory instances do not share cached clients (F2)."""
+        monkeypatch.setenv(ENV_TOKEN, "tok")
+        monkeypatch.setenv(ENV_HOSTNAME, "https://host")
+        cfg = ConfigLoader()
+        cfg.load()
+        mock_mod, mock_uta, mock_fc = mock_sdk
+        f1 = AsyncClientFactory()
+        f2 = AsyncClientFactory()
+        c1 = f1.create(cfg)
+        c2 = f2.create(cfg)
+        # Two separate constructions; clients not shared between factories
+        assert mock_fc.call_count == 2
+        assert c1 is not None
+        assert c2 is not None
+
+    def test_last_client_returns_most_recent(self, clean_env, monkeypatch, mock_sdk):
+        """last_client is a convenience accessor for the most recent client."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
         monkeypatch.setenv(ENV_HOSTNAME, "https://host")
         cfg = ConfigLoader()
         cfg.load()
         mock_mod, mock_uta, mock_fc = mock_sdk
         factory = AsyncClientFactory()
-        factory.create(cfg)
-        assert factory.get() is not None
-        factory.reset()
-        assert factory.get() is None
+        assert factory.last_client is None
+        client = factory.create(cfg)
+        assert factory.last_client is client
 
-    def test_create_second_call_replaces_cache(self, clean_env, monkeypatch, mock_sdk):
-        """Second create() replaces cached instance.
-        
-        Note: MagicMock returns the same mock by default, so we verify
-        FoundryClient was called twice (indicating two separate creations).
-        """
-        monkeypatch.setenv(ENV_TOKEN, "tok")
-        monkeypatch.setenv(ENV_HOSTNAME, "https://host")
-        cfg = ConfigLoader()
-        cfg.load()
-        mock_mod, mock_uta, mock_fc = mock_sdk
-        factory = AsyncClientFactory()
-        factory.create(cfg)
-        call_count_1 = mock_fc.call_count
-        factory.create(cfg)
-        call_count_2 = mock_fc.call_count
-        assert call_count_2 == call_count_1 + 1
-        assert factory.get() is not None
+    def test_no_get_or_reset_classmethods(self):
+        """Legacy singleton API (get/reset) is removed (F2/F3)."""
+        assert not hasattr(AsyncClientFactory, "get")
+        assert not hasattr(AsyncClientFactory, "reset")
 
 
 class TestAsyncClientFactoryConfigLoaderInjection:
@@ -876,6 +1060,14 @@ class TestConfigurationError:
         except Exception:
             pass  # Should be catchable as base Exception
 
+    def test_configuration_error_has_exit_code_9(self):
+        """ConfigurationError carries exit_code 9 per ADR-001 (C2)."""
+        assert ConfigurationError.exit_code == EXIT_CONFIGURATION == 9
+
+    def test_instance_inherits_exit_code(self):
+        err = ConfigurationError("boom")
+        assert err.exit_code == 9
+
 
 # ===========================================================================
 # Integration — Component Chain (Unit-Level)
@@ -896,7 +1088,7 @@ class TestUnitLevelChain:
         factory = AsyncClientFactory()
         client = factory.create(cfg)
         assert client is not None
-        assert factory.get() is client
+        assert factory.last_client is client
 
     def test_chain_fails_on_missing_token(self, clean_env, monkeypatch):
         """Chain fails at AuthProvider validation when token missing."""

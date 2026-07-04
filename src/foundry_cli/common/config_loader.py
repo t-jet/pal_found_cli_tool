@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """ConfigLoader — .env file search path (ADR-006).
 
 Loads configuration from .env file following ADR-006 search path order:
@@ -11,9 +10,9 @@ Never searches home directory.
 """
 
 import os
-import sys
+from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Type, TypeVar
 
 from dotenv import load_dotenv
 
@@ -37,6 +36,15 @@ DEFAULT_TIMEOUT_S = 30
 DEFAULT_MIN_TIMEOUT_S = 1
 DEFAULT_MAX_TIMEOUT_S = 3600
 DEFAULT_FORMAT = "auto"
+
+# Exit code per ADR-001
+EXIT_CONFIGURATION = 9
+
+# Truthy boolean string set — kept consistent across property accessors
+# and get_bool() so the parsing contract is identical everywhere.
+_TRUTHY = ("true", "1", "yes", "on")
+
+_E = TypeVar("_E", bound=Enum)
 
 
 class ConfigLoader:
@@ -115,6 +123,139 @@ class ConfigLoader:
             depth += 1
         return None
 
+    # --- Typed accessors (generic, follow story AC) ---
+
+    def get_str(self, name: str, default: Optional[str] = None) -> Optional[str]:
+        """Get string environment variable value.
+
+        Parameters
+        ----------
+        name : str
+            Environment variable name.
+        default : str, optional
+            Default value if not set.
+
+        Returns
+        -------
+        str or None
+            Environment variable value, stripped of surrounding whitespace,
+            or ``default`` if unset.
+        """
+        val = os.environ.get(name)
+        if val is None:
+            return default
+        return val.strip()
+
+    def get_bool(self, name: str, default: bool = False) -> bool:
+        """Get boolean environment variable value.
+
+        Truthy values (case-insensitive): ``true``, ``1``, ``yes``, ``on``.
+        Everything else (including unset) evaluates per ``default``.
+
+        Parameters
+        ----------
+        name : str
+            Environment variable name.
+        default : bool
+            Default value when the variable is unset.
+
+        Returns
+        -------
+        bool
+            Parsed boolean value.
+        """
+        val = os.environ.get(name)
+        if val is None:
+            return default
+        return val.strip().lower() in _TRUTHY
+
+    def get_int(self, name: str, default: Optional[int] = None) -> Optional[int]:
+        """Get integer environment variable value.
+
+        Parameters
+        ----------
+        name : str
+            Environment variable name.
+        default : int, optional
+            Default value when unset or non-numeric.
+
+        Returns
+        -------
+        int or None
+            Parsed integer, or ``default`` when unset / unparsable.
+        """
+        val = os.environ.get(name)
+        if val is None or val.strip() == "":
+            return default
+        try:
+            return int(val.strip())
+        except ValueError:
+            return default
+
+    def get_float(self, name: str, default: Optional[float] = None) -> Optional[float]:
+        """Get float environment variable value.
+
+        Parameters
+        ----------
+        name : str
+            Environment variable name.
+        default : float, optional
+            Default value when unset or non-numeric.
+
+        Returns
+        -------
+        float or None
+            Parsed float, or ``default`` when unset / unparsable.
+        """
+        val = os.environ.get(name)
+        if val is None or val.strip() == "":
+            return default
+        try:
+            return float(val.strip())
+        except ValueError:
+            return default
+
+    def get_enum(self, name: str, enum_cls: Type[_E], default: Optional[_E] = None) -> Optional[_E]:
+        """Get enum environment variable value (case-insensitive).
+
+        Parameters
+        ----------
+        name : str
+            Environment variable name.
+        enum_cls : Type[Enum]
+            Enum class to coerce into.
+        default : Enum member, optional
+            Default value when unset or not a valid member.
+
+        Returns
+        -------
+        Enum member or None
+            Matching enum member, or ``default``.
+        """
+        val = os.environ.get(name)
+        if val is None or val.strip() == "":
+            return default
+        key = val.strip()
+        # Try name match first (case-insensitive)
+        for member in enum_cls:
+            if member.name.lower() == key.lower():
+                return member
+        # Fall back to value match (case-sensitive — values may be meaningful)
+        for member in enum_cls:
+            if member.value == key:
+                return member
+        return default
+
+    # --- Legacy helper aliases (kept for backward compatibility) ---
+
+    def get_env(self, name: str, default: Optional[str] = None) -> Optional[str]:
+        """Get raw environment variable value (alias of :meth:`get_str`)."""
+        return self.get_str(name, default)
+
+    def get_env_bool(self, name: str, default: bool = False) -> bool:
+        """Get boolean environment variable value (alias of :meth:`get_bool`)."""
+        return self.get_bool(name, default)
+
     # --- Property accessors ---
 
     @property
@@ -152,17 +293,17 @@ class ConfigLoader:
     @property
     def global_readonly(self) -> bool:
         """Global READONLY flag."""
-        return os.environ.get(ENV_READONLY, "").lower() in ("true", "1", "yes")
+        return os.environ.get(ENV_READONLY, "").lower() in _TRUTHY
 
     @property
     def global_metadata_only(self) -> bool:
         """Global METADATA_ONLY flag."""
-        return os.environ.get(ENV_METADATA_ONLY, "").lower() in ("true", "1", "yes")
+        return os.environ.get(ENV_METADATA_ONLY, "").lower() in _TRUTHY
 
     @property
     def enable_attribution(self) -> bool:
         """Attribution enabled flag."""
-        return os.environ.get(ENV_ENABLE_ATTRIBUTION, "").lower() in ("true", "1", "yes")
+        return os.environ.get(ENV_ENABLE_ATTRIBUTION, "").lower() in _TRUTHY
 
     @property
     def attribution_rids(self) -> Optional[str]:
@@ -172,51 +313,20 @@ class ConfigLoader:
     @property
     def enable_tracing(self) -> bool:
         """Tracing enabled flag."""
-        return os.environ.get(ENV_ENABLE_TRACING, "").lower() in ("true", "1", "yes")
+        return os.environ.get(ENV_ENABLE_TRACING, "").lower() in _TRUTHY
 
     @property
     def loaded_file(self) -> Optional[str]:
         """Path to loaded .env file, or None."""
         return self._loaded_file
 
-    def get_env(self, name: str, default: Optional[str] = None) -> Optional[str]:
-        """Get environment variable value.
-
-        Parameters
-        ----------
-        name : str
-            Environment variable name.
-        default : str, optional
-            Default value if not set.
-
-        Returns
-        -------
-        str or None
-            Environment variable value.
-        """
-        return os.environ.get(name, default)
-
-    def get_env_bool(self, name: str, default: bool = False) -> bool:
-        """Get boolean environment variable value.
-
-        Parameters
-        ----------
-        name : str
-            Environment variable name.
-        default : bool
-            Default value if not set.
-
-        Returns
-        -------
-        bool
-            Parsed boolean value.
-        """
-        val = os.environ.get(name)
-        if val is None:
-            return default
-        return val.lower() in ("true", "1", "yes", "on")
-
 
 class ConfigurationError(Exception):
-    """Configuration loading error (exit code 9)."""
-    pass
+    """Configuration loading error (exit code 9 per ADR-001).
+
+    Carries the canonical exit code so callers (CLI entrypoints, error
+    serializers) can map the exception to the correct process exit status
+    without maintaining a separate lookup table.
+    """
+
+    exit_code: int = EXIT_CONFIGURATION

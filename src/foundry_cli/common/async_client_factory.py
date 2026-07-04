@@ -1,21 +1,24 @@
-#!/usr/bin/env python3
-"""AsyncClientFactory — creates and caches AsyncFoundryClient (SRS §3.4).
+"""AsyncClientFactory — creates stateless AsyncFoundryClient (SRS §3.4).
 
-Creates a FoundryClient instance configured with UserTokenAuth
-and injects attribution headers when ENABLE_ATTRIBUTION=true.
+Creates an ``AsyncFoundryClient`` instance per invocation, configured with
+``UserTokenAuth`` and the resolved hostname, and injects attribution
+headers when ``FOUNDRY_AGENTIC_CLI_ENABLE_ATTRIBUTION=true``.
+
+Stateless per invocation (DCC-3): no client is cached across calls —
+each ``create()`` returns a fresh client. This keeps tests isolated,
+avoids shared mutable state, and matches the CLI's per-command lifecycle.
 """
 
-import os
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, List, Optional
 
 from foundry_cli.common.config_loader import ConfigLoader, ConfigurationError
 
 if TYPE_CHECKING:
-    from foundry_sdk import UserTokenAuth
+    from foundry_sdk import AsyncFoundryClient, UserTokenAuth
 
 
 class AsyncClientFactory:
-    """Creates FoundryClient instances.
+    """Creates stateless ``AsyncFoundryClient`` instances.
 
     Usage
     -----
@@ -23,11 +26,17 @@ class AsyncClientFactory:
     >>> client = factory.create(cfg)
     """
 
-    _instance = None
+    def __init__(self) -> None:
+        # Per-instance state only — no class-level caching. Each factory
+        # instance is independent; ``create()`` never mutates shared state.
+        self._last_client: Optional["AsyncFoundryClient"] = None
 
-    @classmethod
-    def create(cls, cfg: ConfigLoader):
-        """Create a FoundryClient configured with credentials from ConfigLoader.
+    def create(self, cfg: ConfigLoader) -> "AsyncFoundryClient":
+        """Create an ``AsyncFoundryClient`` from credentials in ``cfg``.
+
+        Validates token and hostname are present before constructing the
+        client. A new client is returned on every call — nothing is cached
+        on the class.
 
         Parameters
         ----------
@@ -36,58 +45,58 @@ class AsyncClientFactory:
 
         Returns
         -------
-        FoundryClient
-            Configured SDK client instance.
+        AsyncFoundryClient
+            Freshly constructed SDK async client instance.
 
         Raises
         ------
         ConfigurationError
-            If credentials are missing or SDK is not installed.
+            If credentials are missing or the SDK is not installed.
         """
         token = cfg.token
         hostname = cfg.hostname
 
-        if not token or not hostname:
+        # Strip before presence check so whitespace-only tokens are rejected
+        # (review finding A1 applied at the factory boundary as defense in depth).
+        if not token or not token.strip() or not hostname or not hostname.strip():
             raise ConfigurationError(
                 "Missing FOUNDRY_TOKEN and/or FOUNDRY_HOSTNAME. "
                 "Set credentials in .env or shell environment."
             )
 
         try:
-            from foundry_sdk import FoundryClient, UserTokenAuth
-        except ImportError:
+            from foundry_sdk import AsyncFoundryClient, UserTokenAuth
+        except ImportError as exc:
             raise ConfigurationError(
                 "foundry-sdk not installed; run 'pip install foundry-platform-python'"
-            )
+            ) from exc
 
-        auth: UserTokenAuth = UserTokenAuth(token)
+        auth: "UserTokenAuth" = UserTokenAuth(token)
 
-        # Build client kwargs
         client_kwargs: dict[str, Any] = {
             "auth": auth,
             "hostname": hostname,
         }
 
-        # Inject attribution if enabled
+        # Inject attribution when enabled. RIDs are split on commas and each
+        # entry stripped of surrounding whitespace so "rid1, rid2" yields a
+        # clean two-element list (review finding F5).
         if cfg.enable_attribution and cfg.attribution_rids:
-            client_kwargs["attribution_rids"] = cfg.attribution_rids.split(",")
+            rids: List[str] = [r.strip() for r in cfg.attribution_rids.split(",")]
+            rids = [r for r in rids if r]
+            if rids:
+                client_kwargs["attribution_rids"] = rids
 
-        client = FoundryClient(**client_kwargs)
-        cls._instance = client
+        client: "AsyncFoundryClient" = AsyncFoundryClient(**client_kwargs)
+        self._last_client = client
         return client
 
-    @classmethod
-    def get(cls):
-        """Get the cached client instance.
+    @property
+    def last_client(self) -> Optional["AsyncFoundryClient"]:
+        """Most recently created client, or ``None``.
 
-        Returns
-        -------
-        FoundryClient or None
-            Cached client instance.
+        Convenience accessor for inspection/diagnostics only. Callers must
+        not rely on this for caching — ``create()`` always builds a new
+        client.
         """
-        return cls._instance
-
-    @classmethod
-    def reset(cls) -> None:
-        """Reset the cached instance (for testing)."""
-        cls._instance = None
+        return self._last_client

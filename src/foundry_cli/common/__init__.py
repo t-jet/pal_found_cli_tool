@@ -4,10 +4,17 @@ from foundry_cli.common.retry import RetryHandler
 from foundry_cli.common.error_serializer import ErrorSerializer
 from foundry_cli.common.output_formatter import OutputFormatter
 from foundry_cli.common.log_setup import LogSetup
+from foundry_cli.common.config_loader import ConfigLoader, ConfigurationError
+from foundry_cli.common.auth_provider import AuthProvider
+from foundry_cli.common.async_client_factory import AsyncClientFactory
 
 __all__ = [
     "RetryHandler",
     "ErrorSerializer",
     "OutputFormatter",
     "LogSetup",
+    "ConfigLoader",
+    "ConfigurationError",
+    "AuthProvider",
+    "AsyncClientFactory",
 ]
