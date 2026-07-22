@@ -17,8 +17,9 @@ Only READONLY=false override of parent READONLY=true is valid.
 
 import logging
 import os
+import re
 from pathlib import Path
-from typing import Optional, Set
+from typing import Any, Dict, Optional, Set
 
 from foundry_cli.common.config_loader import ConfigLoader
 from foundry_cli.common.error_serializer import EXIT_ACCESS_CONTROL
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 # are classified as writes; all others are reads.
 _WRITE_VERBS = frozenset({
     "create", "delete", "put", "post", "patch", "replace", "update",
-    "add", "remove", "commit", "abort", "upload", "download",
+    "add", "remove", "commit", "abort", "upload", "download", "modify", "upsert",
     "cancel", "revoke", "preregister", "execute", "apply",
     "blocking_continue", "streaming_continue", "rag_context",
 })
@@ -56,11 +57,18 @@ class AccessControlError(Exception):
         Which step of the 8-step precedence model triggered the block.
     """
 
-    def __init__(self, message: str, step: int = 0) -> None:
+    def __init__(
+        self,
+        message: str,
+        step: int = 0,
+        blocked_rule: Optional[Dict[str, Any]] = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.exit_code = EXIT_ACCESS_CONTROL
         self.step = step
+        self.blocked_rule = blocked_rule or {"step": step, "message": message}
+        self.details = {"blocked_rule": self.blocked_rule}
 
 
 class AccessControlGuard:
@@ -114,6 +122,38 @@ class AccessControlGuard:
             if op_lower == verb or op_lower.startswith(verb + "_"):
                 return True
         return False
+
+    def _operation_env_key(self, resource: str, operation: str) -> str:
+        """Build canonical env key suffix for an operation."""
+        op_lower = operation.lower()
+        for verb in _WRITE_VERBS | _METADATA_VERBS:
+            if op_lower == verb:
+                return f"{self.namespace}_{resource.upper()}_{verb.upper()}"
+            prefix = verb + "_"
+            if op_lower.startswith(prefix):
+                object_name = op_lower[len(prefix):]
+                return f"{self.namespace}_{object_name.upper()}_{verb.upper()}"
+        return f"{self.namespace}_{resource.upper()}_{operation.upper()}"
+
+    @staticmethod
+    def _is_true_env(value: Optional[str]) -> bool:
+        return value is not None and value.lower() in ("true", "1", "yes", "on")
+
+    @staticmethod
+    def _is_false_env(value: Optional[str]) -> bool:
+        return value is not None and value.lower() in ("false", "0", "no", "off")
+
+    def _get_global_readonly(self) -> bool:
+        env_val = os.environ.get("FOUNDRY_AGENTIC_CLI_READONLY")
+        if env_val is not None:
+            return self._is_true_env(env_val)
+        return bool(self.cfg.global_readonly)
+
+    def _get_global_metadata_only(self) -> bool:
+        env_val = os.environ.get("FOUNDRY_AGENTIC_CLI_METADATA_ONLY")
+        if env_val is not None:
+            return self._is_true_env(env_val)
+        return bool(self.cfg.global_metadata_only)
 
     def _get_namespace_readonly(self) -> bool:
         """Check if namespace-level READONLY is explicitly set to true.
@@ -204,15 +244,16 @@ class AccessControlGuard:
             return set()
 
         permitted: Set[str] = set()
+        canonical_row = re.compile(
+            r"^\|\s*`(?P<sdk_path>[a-z0-9_]+\.[a-z0-9_]+\.[a-z0-9_]+)`\s*"
+            r"\|\s*PERMITTED\s*\|",
+            re.IGNORECASE,
+        )
         text = allowlist_path.read_text(encoding="utf-8")
         for line in text.splitlines():
-            if "| PERMITTED" not in line:
-                continue
-            # Extract SDK path (first column after |)
-            parts = [p.strip() for p in line.strip().split("|")]
-            if len(parts) >= 2:
-                sdk_path = parts[1].strip()
-                permitted.add(sdk_path.lower())
+            match = canonical_row.match(line.strip())
+            if match:
+                permitted.add(match.group("sdk_path").lower())
         return permitted
 
     def _is_in_metadata_allowlist(self, resource: str, operation: str) -> bool:
@@ -256,10 +297,22 @@ class AccessControlGuard:
         AccessControlError
             If access control blocks the operation.
         """
-        resource_upper = resource.upper()
-        op_upper = operation.upper()
-        full_key = f"{self.namespace}_{resource_upper}_{op_upper}"
+        full_key = self._operation_env_key(resource, operation)
         is_write = self._is_write_operation(operation)
+        op_path = f"{self.namespace.lower()}.{resource.lower()}.{operation.lower()}"
+
+        def _blocked(message: str, step: int, env_var: str, value: str) -> AccessControlError:
+            return AccessControlError(
+                message,
+                step=step,
+                blocked_rule={
+                    "step": step,
+                    "operation": op_path,
+                    "env_var": env_var,
+                    "value": value,
+                    "message": message,
+                },
+            )
 
         # Step 1: Operation-level ENABLED
         enabled_env = f"FOUNDRY_AGENTIC_CLI_{full_key}_ENABLED"
@@ -267,8 +320,11 @@ class AccessControlGuard:
         if enabled_val is not None and enabled_val.lower() == "false":
             self._log_decision("BLOCKED", resource, operation, 1,
                                f"ENABLED=false for {full_key}")
-            raise AccessControlError(
-                f"Operation blocked: ENABLED=false for {full_key}", step=1
+            raise _blocked(
+                f"Operation blocked: ENABLED=false for {full_key}",
+                1,
+                enabled_env,
+                enabled_val,
             )
 
         # Step 2: Namespace-level ENABLED
@@ -277,14 +333,26 @@ class AccessControlGuard:
         if ns_enabled_val is not None and ns_enabled_val.lower() == "false":
             self._log_decision("BLOCKED", resource, operation, 2,
                                f"ENABLED=false for {self.namespace}")
-            raise AccessControlError(
-                f"Namespace blocked: ENABLED=false for {self.namespace}", step=2
+            raise _blocked(
+                f"Namespace blocked: ENABLED=false for {self.namespace}",
+                2,
+                ns_enabled_env,
+                ns_enabled_val,
             )
+
+        ns_metadata_env = f"FOUNDRY_AGENTIC_CLI_{self.namespace}_METADATA_ONLY"
+        ns_metadata_val = os.environ.get(ns_metadata_env)
+        namespace_metadata_only = self._is_true_env(ns_metadata_val)
+        namespace_metadata_override = self._is_false_env(ns_metadata_val)
+        global_metadata_only = self._get_global_metadata_only()
+        metadata_only_active = namespace_metadata_only or (
+            global_metadata_only and not namespace_metadata_override
+        )
 
         # Steps 3-5: READONLY evaluation (only for write operations)
         if is_write:
             parent_readonly = (
-                self.cfg.global_readonly or self._get_namespace_readonly()
+                self._get_global_readonly() or self._get_namespace_readonly()
             )
 
             if parent_readonly:
@@ -308,42 +376,66 @@ class AccessControlGuard:
                     )
                     return  # Explicit write permit for this namespace
 
+                if self._get_namespace_readonly():
+                    self._log_decision(
+                        "BLOCKED", resource, operation, 4,
+                        f"READONLY=true for {self.namespace}"
+                    )
+                    raise _blocked(
+                        "Operation blocked: namespace read-only mode active",
+                        4,
+                        ns_readonly_env,
+                        "true",
+                    )
+
             # Step 5: Global READONLY
-            if self.cfg.global_readonly:
+            if self._get_global_readonly():
                 self._log_decision(
                     "BLOCKED", resource, operation, 5,
                     "Global READONLY=true blocks write"
                 )
-                raise AccessControlError(
-                    "Operation blocked: read-only mode active", step=5
+                raise _blocked(
+                    "Operation blocked: read-only mode active",
+                    5,
+                    "FOUNDRY_AGENTIC_CLI_READONLY",
+                    "true",
                 )
 
-        # Steps 6-7: METADATA_ONLY evaluation
-        parent_metadata_only = (
-            self.cfg.global_metadata_only or self._get_namespace_metadata_only()
-        )
+        # Steps 6-7: METADATA_ONLY evaluation.
+        if global_metadata_only and namespace_metadata_override:
+            self._log_decision(
+                "PERMITTED", resource, operation, 6,
+                f"METADATA_ONLY=false override for {self.namespace}"
+            )
+            return
 
-        if parent_metadata_only:
-            # Step 6: Namespace-level METADATA_ONLY override
-            ns_metadata_env = f"FOUNDRY_AGENTIC_CLI_{self.namespace}_METADATA_ONLY"
-            ns_metadata_val = os.environ.get(ns_metadata_env)
-            if ns_metadata_val is not None and ns_metadata_val.lower() == "false":
+        if metadata_only_active:
+            metadata_env = ns_metadata_env if namespace_metadata_only else "FOUNDRY_AGENTIC_CLI_METADATA_ONLY"
+            if is_write:
+                step = 6 if namespace_metadata_only else 7
                 self._log_decision(
-                    "PERMITTED", resource, operation, 6,
-                    f"METADATA_ONLY=false override for {self.namespace}"
+                    "BLOCKED", resource, operation, 7,
+                    "METADATA_ONLY=true blocks write"
                 )
-                return  # Explicit metadata override
-
-        # Step 7: Global METADATA_ONLY — block content reads not in allow-list
-        if self.cfg.global_metadata_only:
-            # METADATA_ONLY implies READONLY (FR-ACL-4), writes already blocked above
-            if not is_write and not self._is_in_metadata_allowlist(resource, operation):
+                raise _blocked(
+                    "Operation blocked: metadata-only mode active",
+                    step,
+                    metadata_env,
+                    "true",
+                )
+            if (
+                not self._is_metadata_operation(resource, operation)
+                and not self._is_in_metadata_allowlist(resource, operation)
+            ):
                 self._log_decision(
                     "BLOCKED", resource, operation, 7,
                     "Operation not in metadata allow-list"
                 )
-                raise AccessControlError(
-                    "Operation blocked: not in metadata allow-list", step=7
+                raise _blocked(
+                    "Operation blocked: not in metadata allow-list",
+                    7,
+                    metadata_env,
+                    "true",
                 )
 
         # Step 8: Permit
