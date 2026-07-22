@@ -354,19 +354,72 @@ class TestErrorSerializer_TC:
         code = serializer.serialize(exc429, print_to_stdout=False)
         assert code == EXIT_RATE_LIMIT
 
-    def test_TC_ES_008_exit_code_8_access_control_gap(self, stdout_capture):
-        """TC-ES-008: Exit code 8 — AccessControlError (gap analysis).
+    def test_TC_ES_008_exit_code_8_access_control(self, stdout_capture):
+        """TC-ES-008: Exit code 8 — AccessControlError (BUG-SUB-004 fix).
 
-        Note: Exit code 8 exists in ADR-001 taxonomy but has no exception class mapped yet.
-        HTTP 409 maps to EXIT_USER_INPUT in current implementation.
+        Regression coverage for the TC2.R1 defect: AccessControlError fed
+        through ErrorSerializer.serialize() must return exit code 8 per
+        ADR-001, not the previous default 1 (UserInputError). Also asserts
+        the stdout error envelope reports type 'AccessControlError' and the
+        correct exit_code_name.
         """
-        from foundry_cli.common.error_serializer import ErrorSerializer, EXIT_USER_INPUT, EXIT_CODE_NAMES
+        from foundry_cli.common.access_control_guard import AccessControlError
+        from foundry_cli.common.error_serializer import (
+            ErrorSerializer,
+            EXIT_ACCESS_CONTROL,
+            EXIT_USER_INPUT,
+        )
         serializer = ErrorSerializer()
+        exc = AccessControlError(
+            "Access control policy denied: datasets.dataset.create blocked at step 3 (READONLY)",
+            step=3,
+        )
+        code = serializer.serialize(exc, print_to_stdout=False)
+        # Fix: AccessControlError -> EXIT_ACCESS_CONTROL (8)
+        assert code == EXIT_ACCESS_CONTROL
+
+        # HTTP 409 still maps to EXIT_USER_INPUT (unchanged behavior)
         exc409 = _mock_http_exception(409)
-        code = serializer.serialize(exc409, print_to_stdout=False)
-        # Current impl: 409 -> EXIT_USER_INPUT
-        assert code == EXIT_USER_INPUT
-        # Verify exit code 8 name exists in taxonomy
+        code2 = serializer.serialize(exc409, print_to_stdout=False)
+        assert code2 == EXIT_USER_INPUT
+
+    def test_TC_ES_008b_access_control_envelope_and_message(self, stdout_capture):
+        """TC-ES-008b: AccessControlError stdout envelope (BUG-SUB-004).
+
+        Verifies the serialize() stdout envelope for AccessControlError
+        carries type 'AccessControlError', exit_code 8, exit_code_name
+        'AccessControlError', and the original message text.
+        """
+        import io as _io
+        from foundry_cli.common.access_control_guard import AccessControlError
+        from foundry_cli.common.error_serializer import (
+            ErrorSerializer,
+            EXIT_CODE_NAMES,
+        )
+
+        serializer = ErrorSerializer(call_id="bug-sub-004-tc2r1")
+        exc = AccessControlError("blocked at step 3 (READONLY)", step=3)
+
+        # Capture stdout explicitly so the envelope content is verifiable.
+        real_stdout = sys.stdout
+        captured = _io.StringIO()
+        sys.stdout = captured
+        try:
+            code = serializer.serialize(exc, print_to_stdout=True)
+        finally:
+            sys.stdout = real_stdout
+
+        envelope = json.loads(captured.getvalue())
+
+        assert code == 8
+        assert envelope["exit_code"] == 8
+        assert envelope["exit_code_name"] == "AccessControlError"
+        assert envelope["exception_type"] == "AccessControlError"
+        assert envelope["error"] is True
+        assert "blocked at step 3" in envelope["message"]
+        assert envelope["call_id"] == "bug-sub-004-tc2r1"
+
+        # Exit code 8 name still registered in taxonomy
         assert EXIT_CODE_NAMES.get(8) == "AccessControlError"
 
     def test_TC_ES_009_exit_code_9_configuration_error(self, stdout_capture):

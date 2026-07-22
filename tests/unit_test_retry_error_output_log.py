@@ -43,8 +43,16 @@ def reset_log_setup():
 
 @pytest.fixture
 def clean_retry_env(monkeypatch):
-    """Strip all retry-related env vars."""
+    """Strip all retry-related env vars (canonical + legacy)."""
     keys = [
+        # Canonical (per FR-ERR-4 / SRS Table 5.3)
+        "FOUNDRY_AGENTIC_CLI_RETRY_MAX_ATTEMPTS",
+        "FOUNDRY_AGENTIC_CLI_RETRY_INITIAL_DELAY_MS",
+        "FOUNDRY_AGENTIC_CLI_RETRY_MAX_DELAY_MS",
+        "FOUNDRY_AGENTIC_CLI_RETRY_MULTIPLIER",
+        "FOUNDRY_AGENTIC_CLI_RETRY_JITTER",
+        "FOUNDRY_AGENTIC_CLI_TIMEOUT_S",
+        # Legacy (deprecated; stripped so tests are deterministic)
         "FOUNDRY_MAX_RETRIES",
         "FOUNDRY_RETRY_BASE_DELAY",
         "FOUNDRY_RETRY_MAX_DELAY",
@@ -86,68 +94,112 @@ def _mock_http_exception(status_code):
 # ===========================================================================
 
 class TestCalculateDelay:
-    """Test _calculate_delay standalone function."""
+    """Test _calculate_delay standalone function.
+
+    The function now accepts delays in **milliseconds** and a ``multiplier``
+    parameter, returning seconds (per FR-ERR-4 / QUESTION-010 reconciliation).
+    """
 
     def test_delay_attempt_zero(self):
-        """delay at attempt 0 = base_delay (no backoff yet)."""
+        """delay at attempt 0 = initial_delay_ms / 1000."""
         from foundry_cli.common.retry import _calculate_delay
-        delay = _calculate_delay(base_delay=1.0, attempt=0, max_delay=30.0, jitter=False)
+        delay = _calculate_delay(
+            initial_delay_ms=1000.0, attempt=0, max_delay_ms=30000.0,
+            multiplier=2.0, jitter=False,
+        )
         assert delay == 1.0
 
     def test_delay_attempt_one_doubles(self):
-        """delay at attempt 1 = base_delay * 2."""
+        """delay at attempt 1 = initial_delay_ms * multiplier / 1000."""
         from foundry_cli.common.retry import _calculate_delay
-        delay = _calculate_delay(base_delay=1.0, attempt=1, max_delay=30.0, jitter=False)
+        delay = _calculate_delay(
+            initial_delay_ms=1000.0, attempt=1, max_delay_ms=30000.0,
+            multiplier=2.0, jitter=False,
+        )
         assert delay == 2.0
 
     def test_delay_attempt_two_quadruples(self):
-        """delay at attempt 2 = base_delay * 4."""
+        """delay at attempt 2 = initial_delay_ms * multiplier**2 / 1000."""
         from foundry_cli.common.retry import _calculate_delay
-        delay = _calculate_delay(base_delay=1.0, attempt=2, max_delay=30.0, jitter=False)
+        delay = _calculate_delay(
+            initial_delay_ms=1000.0, attempt=2, max_delay_ms=30000.0,
+            multiplier=2.0, jitter=False,
+        )
         assert delay == 4.0
 
     def test_delay_capped_at_max_delay(self):
-        """delay capped at max_delay regardless of attempt."""
+        """delay capped at max_delay_ms regardless of attempt."""
         from foundry_cli.common.retry import _calculate_delay
-        delay = _calculate_delay(base_delay=10.0, attempt=5, max_delay=30.0, jitter=False)
-        # 10 * 2^5 = 320, should be capped at 30
+        delay = _calculate_delay(
+            initial_delay_ms=10000.0, attempt=5, max_delay_ms=30000.0,
+            multiplier=2.0, jitter=False,
+        )
+        # 10000 * 2^5 = 320000ms, capped at 30000ms → 30.0s
         assert delay == 30.0
 
     def test_delay_respects_max_delay_boundary(self):
-        """delay exactly at max_delay boundary."""
+        """delay exactly at max_delay_ms boundary."""
         from foundry_cli.common.retry import _calculate_delay
-        delay = _calculate_delay(base_delay=15.0, attempt=1, max_delay=30.0, jitter=False)
-        # 15 * 2 = 30, exactly at cap
+        delay = _calculate_delay(
+            initial_delay_ms=15000.0, attempt=1, max_delay_ms=30000.0,
+            multiplier=2.0, jitter=False,
+        )
+        # 15000 * 2 = 30000ms, exactly at cap → 30.0s
         assert delay == 30.0
 
     def test_jitter_enabled_varies_delay(self):
         """Jitter should produce delay within ±10% of base."""
         from foundry_cli.common.retry import _calculate_delay
         delays = [
-            _calculate_delay(base_delay=10.0, attempt=0, max_delay=30.0, jitter=True)
+            _calculate_delay(
+                initial_delay_ms=10000.0, attempt=0, max_delay_ms=30000.0,
+                multiplier=2.0, jitter=True,
+            )
             for _ in range(50)
         ]
-        # All delays should be between 9.0 and 11.0 (10 ± 10%)
+        # All delays should be between 9.0 and 11.0 (10s ± 10%)
         assert all(9.0 <= d <= 11.0 for d in delays)
 
     def test_jitter_disabled_deterministic(self):
         """Without jitter, delay is deterministic."""
         from foundry_cli.common.retry import _calculate_delay
-        d1 = _calculate_delay(base_delay=1.0, attempt=3, max_delay=30.0, jitter=False)
-        d2 = _calculate_delay(base_delay=1.0, attempt=3, max_delay=30.0, jitter=False)
+        d1 = _calculate_delay(
+            initial_delay_ms=1000.0, attempt=3, max_delay_ms=30000.0,
+            multiplier=2.0, jitter=False,
+        )
+        d2 = _calculate_delay(
+            initial_delay_ms=1000.0, attempt=3, max_delay_ms=30000.0,
+            multiplier=2.0, jitter=False,
+        )
         assert d1 == d2
 
     def test_zero_base_delay(self):
-        """Zero base_delay produces zero delay."""
+        """Zero initial_delay_ms produces zero delay."""
         from foundry_cli.common.retry import _calculate_delay
-        delay = _calculate_delay(base_delay=0.0, attempt=5, max_delay=30.0, jitter=False)
+        delay = _calculate_delay(
+            initial_delay_ms=0.0, attempt=5, max_delay_ms=30000.0,
+            multiplier=2.0, jitter=False,
+        )
         assert delay == 0.0
 
     def test_negative_base_delay_clamped_by_formula(self):
-        """Negative base_delay produces negative delay (edge case)."""
+        """Negative initial_delay_ms produces negative delay (edge case)."""
         from foundry_cli.common.retry import _calculate_delay
-        delay = _calculate_delay(base_delay=-1.0, attempt=0, max_delay=30.0, jitter=False)
-        assert delay == -1.0
+        delay = _calculate_delay(
+            initial_delay_ms=-1.0, attempt=0, max_delay_ms=30000.0,
+            multiplier=2.0, jitter=False,
+        )
+        assert delay == -0.001
+
+    def test_custom_multiplier(self):
+        """Non-2.0 multiplier changes backoff rate."""
+        from foundry_cli.common.retry import _calculate_delay
+        # multiplier=3.0: 1000 * 3^2 = 9000ms → 9.0s
+        delay = _calculate_delay(
+            initial_delay_ms=1000.0, attempt=2, max_delay_ms=30000.0,
+            multiplier=3.0, jitter=False,
+        )
+        assert delay == 9.0
 
 
 class TestParseBoolEnv:
@@ -177,52 +229,81 @@ class TestParseBoolEnv:
 
 
 class TestRetryHandlerInit:
-    """Test RetryHandler initialization and defaults."""
+    """Test RetryHandler initialization and defaults.
+
+    Defaults are now in **milliseconds** (per FR-ERR-4 / SRS Table 5.3),
+    exposed in seconds via the ``base_delay``/``max_delay`` properties for
+    backwards compatibility.
+    """
 
     def test_defaults(self, clean_retry_env):
-        from foundry_cli.common.retry import RetryHandler, DEFAULT_MAX_RETRIES, DEFAULT_BASE_DELAY, DEFAULT_MAX_DELAY, DEFAULT_JITTER
+        from foundry_cli.common.retry import (
+            RetryHandler,
+            DEFAULT_MAX_ATTEMPTS,
+            DEFAULT_INITIAL_DELAY_MS,
+            DEFAULT_MAX_DELAY_MS,
+            DEFAULT_MULTIPLIER,
+            DEFAULT_JITTER,
+        )
         handler = RetryHandler()
-        assert handler.max_retries == DEFAULT_MAX_RETRIES
-        assert handler.base_delay == DEFAULT_BASE_DELAY
-        assert handler.max_delay == DEFAULT_MAX_DELAY
+        assert handler.max_retries == DEFAULT_MAX_ATTEMPTS
+        assert handler.base_delay_ms == DEFAULT_INITIAL_DELAY_MS
+        assert handler.max_delay_ms == DEFAULT_MAX_DELAY_MS
+        assert handler.multiplier == DEFAULT_MULTIPLIER
         assert handler.jitter == DEFAULT_JITTER
+        # Seconds-exposed properties derived from ms values.
+        assert handler.base_delay == DEFAULT_INITIAL_DELAY_MS / 1000.0
+        assert handler.max_delay == DEFAULT_MAX_DELAY_MS / 1000.0
 
     def test_explicit_params_override_defaults(self, clean_retry_env):
         from foundry_cli.common.retry import RetryHandler
-        handler = RetryHandler(max_retries=5, base_delay=2.0, max_delay=60.0, jitter=False)
+        handler = RetryHandler(
+            max_retries=5, base_delay=2000.0, max_delay=60000.0,
+            multiplier=3.0, jitter=False,
+        )
         assert handler.max_retries == 5
-        assert handler.base_delay == 2.0
-        assert handler.max_delay == 60.0
+        assert handler.base_delay_ms == 2000.0
+        assert handler.max_delay_ms == 60000.0
+        assert handler.multiplier == 3.0
         assert handler.jitter is False
 
-    def test_env_var_max_retries(self, clean_retry_env, monkeypatch):
-        from foundry_cli.common.retry import RetryHandler, ENV_MAX_RETRIES
-        monkeypatch.setenv(ENV_MAX_RETRIES, "7")
+    def test_env_var_max_attempts(self, clean_retry_env, monkeypatch):
+        from foundry_cli.common.retry import RetryHandler, ENV_MAX_ATTEMPTS
+        monkeypatch.setenv(ENV_MAX_ATTEMPTS, "7")
         handler = RetryHandler()
         assert handler.max_retries == 7
 
-    def test_env_var_base_delay(self, clean_retry_env, monkeypatch):
-        from foundry_cli.common.retry import RetryHandler, ENV_RETRY_BASE_DELAY
-        monkeypatch.setenv(ENV_RETRY_BASE_DELAY, "5.5")
+    def test_env_var_initial_delay_ms(self, clean_retry_env, monkeypatch):
+        from foundry_cli.common.retry import RetryHandler, ENV_INITIAL_DELAY_MS
+        monkeypatch.setenv(ENV_INITIAL_DELAY_MS, "5500")
         handler = RetryHandler()
+        assert handler.base_delay_ms == 5500.0
+        # Exposed property is in seconds.
         assert handler.base_delay == 5.5
 
-    def test_env_var_max_delay(self, clean_retry_env, monkeypatch):
-        from foundry_cli.common.retry import RetryHandler, ENV_RETRY_MAX_DELAY
-        monkeypatch.setenv(ENV_RETRY_MAX_DELAY, "100.0")
+    def test_env_var_max_delay_ms(self, clean_retry_env, monkeypatch):
+        from foundry_cli.common.retry import RetryHandler, ENV_MAX_DELAY_MS
+        monkeypatch.setenv(ENV_MAX_DELAY_MS, "100000")
         handler = RetryHandler()
+        assert handler.max_delay_ms == 100000.0
         assert handler.max_delay == 100.0
 
+    def test_env_var_multiplier(self, clean_retry_env, monkeypatch):
+        from foundry_cli.common.retry import RetryHandler, ENV_MULTIPLIER
+        monkeypatch.setenv(ENV_MULTIPLIER, "1.5")
+        handler = RetryHandler()
+        assert handler.multiplier == 1.5
+
     def test_env_var_jitter(self, clean_retry_env, monkeypatch):
-        from foundry_cli.common.retry import RetryHandler, ENV_RETRY_JITTER
-        monkeypatch.setenv(ENV_RETRY_JITTER, "false")
+        from foundry_cli.common.retry import RetryHandler, ENV_JITTER
+        monkeypatch.setenv(ENV_JITTER, "false")
         handler = RetryHandler()
         assert handler.jitter is False
 
     def test_explicit_params_override_env(self, clean_retry_env, monkeypatch):
         """Explicit constructor params take precedence over env vars."""
-        from foundry_cli.common.retry import RetryHandler, ENV_MAX_RETRIES
-        monkeypatch.setenv(ENV_MAX_RETRIES, "7")
+        from foundry_cli.common.retry import RetryHandler, ENV_MAX_ATTEMPTS
+        monkeypatch.setenv(ENV_MAX_ATTEMPTS, "7")
         handler = RetryHandler(max_retries=2)
         assert handler.max_retries == 2
 
@@ -238,11 +319,15 @@ class TestRetryHandlerInit:
 
     def test_repr(self, clean_retry_env):
         from foundry_cli.common.retry import RetryHandler
-        handler = RetryHandler(max_retries=3, base_delay=1.0, max_delay=30.0, jitter=True)
+        handler = RetryHandler(
+            max_retries=3, base_delay=1000.0, max_delay=30000.0,
+            multiplier=2.0, jitter=True,
+        )
         r = repr(handler)
         assert "max_retries=3" in r
-        assert "base_delay=1.0" in r
-        assert "max_delay=30.0" in r
+        assert "base_delay=1.0" in r  # seconds
+        assert "max_delay=30.0" in r  # seconds
+        assert "multiplier=2.0" in r
         assert "jitter=True" in r
 
 
@@ -339,7 +424,7 @@ class TestRetryHandlerExecute:
         with patch("foundry_cli.common.retry.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             with pytest.raises(ValueError):
                 await handler.execute(mock_coro)
-            mock_sleep.assert_called_once_with(0.5)
+            mock_sleep.assert_called_once_with(0.0005)
 
     @pytest.mark.asyncio
     async def test_retry_with_different_delays(self, clean_retry_env):
@@ -351,7 +436,7 @@ class TestRetryHandlerExecute:
             with pytest.raises(ValueError):
                 await handler.execute(mock_coro)
             calls = [c[0][0] for c in mock_sleep.call_args_list]
-            assert calls == [1.0, 2.0, 4.0]
+            assert calls == [0.001, 0.002, 0.004]
 
     @pytest.mark.asyncio
     async def test_delay_capped_in_execute(self, clean_retry_env):
@@ -363,9 +448,105 @@ class TestRetryHandlerExecute:
             with pytest.raises(ValueError):
                 await handler.execute(mock_coro)
             calls = [c[0][0] for c in mock_sleep.call_args_list]
-            assert all(d <= 15.0 for d in calls)
-            assert calls[0] == 10.0  # 10 * 2^0 = 10
-            assert calls[1] == 15.0  # 10 * 2^1 = 20 → capped at 15
+            assert all(d <= 0.015 for d in calls)
+            assert calls[0] == 0.01  # 10ms * 2^0 -> 0.01s
+            assert calls[1] == 0.015  # 10ms * 2^1 capped at 15ms -> 0.015s
+
+    @pytest.mark.asyncio
+    async def test_execute_wraps_each_attempt_in_wait_for(self, clean_retry_env, monkeypatch):
+        """BUG-SUB-001: each attempt uses asyncio.wait_for with env timeout."""
+        from foundry_cli.common.retry import RetryHandler, ENV_TIMEOUT_S
+
+        monkeypatch.setenv(ENV_TIMEOUT_S, "0.25")
+        handler = RetryHandler(max_retries=0)
+        mock_coro = AsyncMock(return_value="success")
+        wait_for_calls = []
+
+        async def fake_wait_for(coro, *, timeout):
+            wait_for_calls.append(timeout)
+            return await coro
+
+        with patch("foundry_cli.common.retry.asyncio.wait_for", new=fake_wait_for):
+            result = await handler.execute(mock_coro)
+
+        assert result == "success"
+        assert wait_for_calls == [0.25]
+
+    @pytest.mark.asyncio
+    async def test_timeout_breach_raises_timeout_error(self, clean_retry_env):
+        """BUG-SUB-001: timeout breach surfaces as asyncio.TimeoutError."""
+        from foundry_cli.common.retry import RetryHandler
+
+        handler = RetryHandler(max_retries=0, timeout_s=0.001)
+
+        async def slow_call():
+            await asyncio.sleep(1)
+
+        with pytest.raises(asyncio.TimeoutError):
+            await handler.execute(slow_call)
+
+    @pytest.mark.asyncio
+    async def test_http_429_and_503_are_retryable(self, clean_retry_env):
+        """BUG-SUB-002: HTTP 429/503 retry even for SDK-style errors."""
+        from foundry_cli.common.retry import RetryHandler
+
+        for status_code in (429, 503):
+            handler = RetryHandler(
+                max_retries=1,
+                base_delay=0.0,
+                jitter=False,
+                retry_on=(ValueError,),
+                timeout_s=None,
+            )
+            call_count = 0
+
+            async def sdk_call():
+                nonlocal call_count
+                call_count += 1
+                if call_count == 1:
+                    raise _mock_http_exception(status_code)
+                return "success"
+
+            assert await handler.execute(sdk_call) == "success"
+            assert call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_http_non_429_503_does_not_retry(self, clean_retry_env):
+        """BUG-SUB-002: unrelated HTTP errors do not retry."""
+        from foundry_cli.common.retry import RetryHandler
+
+        handler = RetryHandler(
+            max_retries=3,
+            base_delay=0.0,
+            jitter=False,
+            retry_on=(Exception,),
+            timeout_s=None,
+        )
+        mock_coro = AsyncMock(side_effect=_mock_http_exception(500))
+
+        with pytest.raises(Exception, match="HTTP 500"):
+            await handler.execute(mock_coro)
+        mock_coro.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_signal_cancellation_maps_to_timeout_error(self, clean_retry_env):
+        """BUG-SUB-003: signal-triggered cancellation exits as timeout error."""
+        from foundry_cli.common.retry import RetryHandler, SignalCancellationError
+
+        handler = RetryHandler(max_retries=3, base_delay=0.0, jitter=False)
+
+        async def cancelled_call():
+            raise asyncio.CancelledError()
+
+        class FakeSignalScope:
+            signum = 2
+
+            def install(self):
+                return lambda: None
+
+        with patch("foundry_cli.common.retry._SignalCancellationScope", return_value=FakeSignalScope()):
+            with pytest.raises(SignalCancellationError, match="SIGINT"):
+                await handler.execute(cancelled_call)
 
 
 class TestRetryHandlerDecorator:

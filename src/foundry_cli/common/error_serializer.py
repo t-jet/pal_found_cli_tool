@@ -135,6 +135,23 @@ def _register_sdk_exceptions() -> Dict[Type[BaseException], int]:
         OSError: EXIT_CONFIGURATION,
     }
 
+    # Register the CLI's own AccessControlError -> exit code 8 (ADR-001).
+    # BUG-SUB-004: without this entry, serialize() falls through to the
+    # EXIT_USER_INPUT default because AccessControlError carries no HTTP
+    # status, so HTTP classification cannot rescue it. The import is lazy to
+    # avoid a circular dependency: access_control_guard imports
+    # EXIT_ACCESS_CONTROL from this module at its import time, which is safe
+    # because this function runs only after EXIT_ACCESS_CONTROL is defined.
+    try:
+        from foundry_cli.common.access_control_guard import (
+            AccessControlError,  # type: ignore[import-not-found]
+        )
+    except ImportError:
+        AccessControlError = None  # type: ignore[assignment, misc]
+
+    if AccessControlError is not None:
+        mapping[AccessControlError] = EXIT_ACCESS_CONTROL
+
     # Attempt to register real SDK exception types. This is best-effort: if the
     # SDK is not importable, HTTP status code classification in
     # `_classify_http_exception` remains the primary mapping path.
