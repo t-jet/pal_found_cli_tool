@@ -288,6 +288,27 @@ async def test_binary_download_uses_handler(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_binary_download_accepts_sync_chunk_iterator(monkeypatch):
+    client = MagicMock()
+    client.read = AsyncMock(return_value=iter([b"a", b"b"]))
+    saved = {}
+
+    class Handler:
+        async def save(self, stream, **kwargs):
+            saved["chunks"] = [chunk async for chunk in stream]
+            return MagicMock(to_dict=lambda: {"file_size": 2})
+
+    monkeypatch.setattr(foundry_ontologies_cli, "BinaryDownloadHandler", lambda config=None: Handler())
+
+    result = await foundry_ontologies_cli._invoke(
+        "attachment", "read", client, _ns(attachment_rid="rid"), 4, MagicMock()
+    )
+
+    assert result == {"file_size": 2}
+    assert saved["chunks"] == [b"a", b"b"]
+
+
+@pytest.mark.asyncio
 async def test_main_success_uses_acl_retry_output_and_b3_scope(monkeypatch, capsys):
     client = MagicMock()
     client.get = AsyncMock(return_value={"rid": "x"})

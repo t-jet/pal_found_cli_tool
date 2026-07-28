@@ -283,6 +283,10 @@ async def _bytes_iter(value: bytes | bytearray | AsyncIterable[bytes]) -> AsyncI
     if isinstance(value, (bytes, bytearray)):
         yield bytes(value)
         return
+    if isinstance(value, Iterable):
+        for chunk in value:
+            yield bytes(chunk)
+        return
     async for chunk in value:
         yield chunk
 
