@@ -1,17 +1,20 @@
 """AsyncClientFactory — creates stateless AsyncFoundryClient (SRS §3.4).
 
 Creates an ``AsyncFoundryClient`` instance per invocation, configured with
-``UserTokenAuth`` and the resolved hostname, and injects attribution
-headers when ``FOUNDRY_AGENTIC_CLI_ENABLE_ATTRIBUTION=true``.
+``UserTokenAuth`` and the resolved hostname. When attribution is enabled,
+the SDK attribution context variable is set for the current invocation.
 
 Stateless per invocation (DCC-3): no client is cached across calls —
 each ``create()`` returns a fresh client. This keeps tests isolated,
 avoids shared mutable state, and matches the CLI's per-command lifecycle.
 """
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, List, Optional
 
 from foundry_cli.common.config_loader import ConfigLoader, ConfigurationError
+from foundry_cli.common.tracing_provider import B3Context, TracingProvider
 
 if TYPE_CHECKING:
     from foundry_sdk import AsyncFoundryClient, UserTokenAuth
@@ -65,10 +68,10 @@ class AsyncClientFactory:
             )
 
         try:
-            from foundry_sdk import AsyncFoundryClient, UserTokenAuth
+            from foundry_sdk import ATTRIBUTION_VAR, AsyncFoundryClient, UserTokenAuth
         except ImportError as exc:
             raise ConfigurationError(
-                "foundry-sdk not installed; run 'pip install foundry-platform-python'"
+                "foundry-sdk not installed; run 'pip install foundry-platform-sdk'"
             ) from exc
 
         auth: "UserTokenAuth" = UserTokenAuth(token)
@@ -76,20 +79,34 @@ class AsyncClientFactory:
         client_kwargs: dict[str, Any] = {
             "auth": auth,
             "hostname": hostname,
+            "preview": True,
         }
 
-        # Inject attribution when enabled. RIDs are split on commas and each
-        # entry stripped of surrounding whitespace so "rid1, rid2" yields a
-        # clean two-element list (review finding F5).
+        # SDK reads attribution from a context variable when sending requests.
+        # Always set it here so disabled or empty config clears prior values.
+        rids: List[str] = []
         if cfg.enable_attribution and cfg.attribution_rids:
-            rids: List[str] = [r.strip() for r in cfg.attribution_rids.split(",")]
+            rids = [r.strip() for r in cfg.attribution_rids.split(",")]
             rids = [r for r in rids if r]
-            if rids:
-                client_kwargs["attribution_rids"] = rids
+        ATTRIBUTION_VAR.set(rids or None)
 
         client: "AsyncFoundryClient" = AsyncFoundryClient(**client_kwargs)
         self._last_client = client
         return client
+
+    @contextmanager
+    def invocation_scope(
+        self,
+        cfg: ConfigLoader,
+        supplied: B3Context | None = None,
+    ) -> Iterator[B3Context | None]:
+        """Keep one trace context active across client creation and SDK calls.
+
+        Callers enter this scope before :meth:`create` and leave it only after
+        retry handling and response processing finish.
+        """
+        with TracingProvider(config=cfg).scope(supplied) as context:
+            yield context
 
     @property
     def last_client(self) -> Optional["AsyncFoundryClient"]:

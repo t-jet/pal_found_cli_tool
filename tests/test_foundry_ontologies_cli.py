@@ -2,7 +2,7 @@
 """Unit tests for Foundry Ontologies CLI."""
 
 import argparse
-import asyncio
+import importlib
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -15,8 +15,6 @@ if str(_SRC) not in sys.path:
 
 _SKILL_DIR = Path(__file__).parent.parent / ".claude" / "skills" / "foundry-ontologies" / "scripts"
 sys.path.insert(0, str(_SKILL_DIR))
-
-import importlib
 
 foundry_ontologies_cli = importlib.import_module("foundry_ontologies_cli")
 
