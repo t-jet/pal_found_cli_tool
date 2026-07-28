@@ -115,57 +115,76 @@ class TestRetryHandler_TC:
     def test_TC_RH_001_exponential_backoff_delay_calculation(self, clean_retry_env):
         """TC-RH-001: Exponential backoff delay calculation.
 
-        Given a RetryHandler with base_delay=1.0, max_delay=30.0, jitter=False
+        Given a RetryHandler with initial_delay_ms=1000, max_delay_ms=30000, jitter=False
         When _calculate_delay() is called for attempts 0-4
         Then delays are [1.0, 2.0, 4.0, 8.0, 16.0]
         """
         from foundry_cli.common.retry import _calculate_delay
         expected = [1.0, 2.0, 4.0, 8.0, 16.0]
         for attempt, exp_delay in enumerate(expected):
-            delay = _calculate_delay(base_delay=1.0, attempt=attempt, max_delay=30.0, jitter=False)
+            delay = _calculate_delay(
+                initial_delay_ms=1000.0,
+                attempt=attempt,
+                max_delay_ms=30000.0,
+                multiplier=2.0,
+                jitter=False,
+            )
             assert delay == pytest.approx(exp_delay), f"Attempt {attempt}: expected {exp_delay}, got {delay}"
 
     def test_TC_RH_002_max_delay_cap_enforcement(self, clean_retry_env):
         """TC-RH-002: Max delay cap enforcement.
 
-        Given base_delay=1.0, max_delay=5.0, jitter=False
+        Given initial_delay_ms=1000, max_delay_ms=5000, jitter=False
         When _calculate_delay() is called for attempts 0-5
         Then delays are [1.0, 2.0, 4.0, 5.0, 5.0, 5.0] — capped at 5.0 from attempt 3
         """
         from foundry_cli.common.retry import _calculate_delay
         expected = [1.0, 2.0, 4.0, 5.0, 5.0, 5.0]
         for attempt, exp_delay in enumerate(expected):
-            delay = _calculate_delay(base_delay=1.0, attempt=attempt, max_delay=5.0, jitter=False)
+            delay = _calculate_delay(
+                initial_delay_ms=1000.0,
+                attempt=attempt,
+                max_delay_ms=5000.0,
+                multiplier=2.0,
+                jitter=False,
+            )
             assert delay == pytest.approx(exp_delay), f"Attempt {attempt}: expected {exp_delay}, got {delay}"
 
     def test_TC_RH_003_jitter_randomness_within_bounds(self, clean_retry_env):
         """TC-RH-003: Jitter randomness within bounds.
 
-        Given base_delay=1.0, jitter=True
+        Given initial_delay_ms=1000, jitter=True
         When _calculate_delay() is called 100 times
         Then each delay is within [0.9, 1.1] (+-10% of base_delay)
         """
         from foundry_cli.common.retry import _calculate_delay
         for _ in range(100):
-            delay = _calculate_delay(base_delay=1.0, attempt=0, max_delay=30.0, jitter=True)
+            delay = _calculate_delay(
+                initial_delay_ms=1000.0,
+                attempt=0,
+                max_delay_ms=30000.0,
+                multiplier=2.0,
+                jitter=True,
+            )
             assert 0.9 <= delay <= 1.1, f"Jitter delay {delay} out of bounds [0.9, 1.1]"
 
     def test_TC_RH_004_environment_variable_override(self, clean_retry_env, monkeypatch):
         """TC-RH-004: Environment variable override for all config params.
 
-        Given env vars set: FOUNDRY_MAX_RETRIES=5, FOUNDRY_RETRY_BASE_DELAY=2.0,
-        FOUNDRY_RETRY_MAX_DELAY=10.0, FOUNDRY_RETRY_JITTER=false
+        Given canonical retry env vars are set
         When RetryHandler() is instantiated with no constructor arguments
         Then handler reads all values from env vars
         """
         from foundry_cli.common.retry import RetryHandler
-        monkeypatch.setenv("FOUNDRY_MAX_RETRIES", "5")
-        monkeypatch.setenv("FOUNDRY_RETRY_BASE_DELAY", "2.0")
-        monkeypatch.setenv("FOUNDRY_RETRY_MAX_DELAY", "10.0")
-        monkeypatch.setenv("FOUNDRY_RETRY_JITTER", "false")
+        monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_RETRY_MAX_ATTEMPTS", "5")
+        monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_RETRY_INITIAL_DELAY_MS", "2000")
+        monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_RETRY_MAX_DELAY_MS", "10000")
+        monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_RETRY_JITTER", "false")
 
         handler = RetryHandler()
         assert handler.max_retries == 5
+        assert handler.base_delay_ms == 2000.0
+        assert handler.max_delay_ms == 10000.0
         assert handler.base_delay == 2.0
         assert handler.max_delay == 10.0
         assert handler.jitter is False
@@ -567,14 +586,14 @@ class TestOutputFormatter_TC:
 class TestLogSetup_TC:
     """QA test cases for LogSetup per TESTCASE-001."""
 
-    def test_TC_LS_001_ndjson_format_single_json_line(self, clean_log_env, stderr_capture):
+    def test_TC_LS_001_ndjson_format_single_json_line(self, clean_log_env, capfd):
         """TC-LS-001: NDJSON format — single JSON line per log record."""
         from foundry_cli.common.log_setup import LogSetup
         LogSetup.configure(log_level="WARNING")
         logger = logging.getLogger("test_tc_ls_001")
         logger.warning("test message")
 
-        output = stderr_capture.getvalue().strip()
+        output = capfd.readouterr().err.strip()
         lines = [l for l in output.split("\n") if l.strip()]
         # Should produce a valid JSON line
         log_line = lines[0]
@@ -584,14 +603,14 @@ class TestLogSetup_TC:
         assert "logger" in parsed
         assert "msg" in parsed
 
-    def test_TC_LS_002_required_fields_present(self, clean_log_env, stderr_capture):
+    def test_TC_LS_002_required_fields_present(self, clean_log_env, capfd):
         """TC-LS-002: Required fields present in log record."""
         from foundry_cli.common.log_setup import LogSetup
         LogSetup.configure(log_level="INFO")
         logger = logging.getLogger("test_tc_ls_002")
         logger.info("test")
 
-        output = stderr_capture.getvalue().strip()
+        output = capfd.readouterr().err.strip()
         parsed = json.loads(output.split("\n")[0])
         assert parsed["level"] == "INFO"
         assert parsed["msg"] == "test"
@@ -599,7 +618,7 @@ class TestLogSetup_TC:
         assert "T" in parsed["ts"]
         assert parsed["ts"].endswith("+00:00") or "Z" in parsed["ts"]
 
-    def test_TC_LS_003_log_level_filtering(self, clean_log_env, stderr_capture):
+    def test_TC_LS_003_log_level_filtering(self, clean_log_env, capfd):
         """TC-LS-003: Log level filtering."""
         from foundry_cli.common.log_setup import LogSetup
         LogSetup.configure(log_level="WARNING")
@@ -610,7 +629,7 @@ class TestLogSetup_TC:
         logger.warning("warning msg")
         logger.error("error msg")
 
-        output = stderr_capture.getvalue()
+        output = capfd.readouterr().err
         # Debug and info should NOT appear
         assert "debug msg" not in output
         assert "info msg" not in output
@@ -618,7 +637,7 @@ class TestLogSetup_TC:
         assert "warning msg" in output
         assert "error msg" in output
 
-    def test_TC_LS_004_env_var_log_level_override(self, clean_log_env, stderr_capture, monkeypatch):
+    def test_TC_LS_004_env_var_log_level_override(self, clean_log_env, capfd, monkeypatch):
         """TC-LS-004: Environment variable log level override."""
         from foundry_cli.common.log_setup import LogSetup
         monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_LOG_LEVEL", "DEBUG")
@@ -626,7 +645,7 @@ class TestLogSetup_TC:
         logger = logging.getLogger("test_tc_ls_004")
 
         logger.debug("debug from env")
-        output = stderr_capture.getvalue()
+        output = capfd.readouterr().err
         assert "debug from env" in output
 
     def test_TC_LS_005_invalid_log_level_raises(self, clean_log_env):
@@ -637,32 +656,28 @@ class TestLogSetup_TC:
         assert "TRACE" in str(exc_info.value)
         assert "DEBUG" in str(exc_info.value)  # Should list valid levels
 
-    def test_TC_LS_006_context_extra_fields_in_log(self, clean_log_env, stderr_capture):
+    def test_TC_LS_006_context_extra_fields_in_log(self, clean_log_env, capfd):
         """TC-LS-006: Context/extra fields included in log output."""
         from foundry_cli.common.log_setup import LogSetup
         LogSetup.configure(log_level="WARNING")
         logger = logging.getLogger("test_tc_ls_006")
         logger.warning("retry", extra={"op": "datasets.list", "attempt": 2, "delay_ms": 1000})
 
-        output = stderr_capture.getvalue().strip()
+        output = capfd.readouterr().err.strip()
         parsed = json.loads(output.split("\n")[0])
         assert parsed.get("op") == "datasets.list"
         assert parsed.get("attempt") == 2
         assert parsed.get("delay_ms") == 1000
 
-    def test_TC_LS_007_metadata_separator_and_emit(self, clean_log_env, stderr_capture):
+    def test_TC_LS_007_metadata_separator_and_emit(self, clean_log_env, capfd):
         """TC-LS-007: Metadata separator and emit_metadata."""
         from foundry_cli.common.log_setup import LogSetup, METADATA_SEPARATOR
         LogSetup.emit_metadata_separator()
-        output = stderr_capture.getvalue()
+        output = capfd.readouterr().err
         assert METADATA_SEPARATOR in output
 
-        # Reset capture
-        stderr_capture.truncate(0)
-        stderr_capture.seek(0)
-
         LogSetup.emit_metadata({"key": "value"})
-        output = stderr_capture.getvalue()
+        output = capfd.readouterr().err
         assert METADATA_SEPARATOR in output
         # After separator should be JSON metadata
         lines = [l for l in output.split("\n") if l.strip()]
@@ -705,7 +720,7 @@ class TestIntegration_TC:
         assert isinstance(code, int)
         assert 0 <= code <= 9
 
-    def test_TC_INT_002_stderr_separation(self, clean_log_env, stderr_capture, stdout_capture):
+    def test_TC_INT_002_stderr_separation(self, clean_log_env, capfd):
         """TC-INT-002: OutputFormatter + LogSetup — stderr separation."""
         from foundry_cli.common.log_setup import LogSetup
         from foundry_cli.common.output_formatter import OutputFormatter
@@ -718,16 +733,18 @@ class TestIntegration_TC:
 
         logger.warning("log message")
 
-        stdout_output = stdout_capture.getvalue()
-        stderr_output = stderr_capture.getvalue()
+        captured = capfd.readouterr()
+        stdout_output = captured.out
+        stderr_output = captured.err
 
-        # Error JSON should go to stdout
-        assert "error" in stdout_output
+        # Error JSON and logs should go to stderr; stdout stays for result data.
+        assert stdout_output == ""
+        assert "error" in stderr_output
 
         # Log NDJSON should go to stderr
         assert "log message" in stderr_output or "msg" in stderr_output
 
-    def test_TC_INT_003_full_pipeline(self, clean_retry_env, clean_log_env, stderr_capture, stdout_capture):
+    def test_TC_INT_003_full_pipeline(self, clean_retry_env, clean_log_env, capfd):
         """TC-INT-003: Full pipeline — retry -> serialize -> format -> log."""
         from foundry_cli.common.retry import RetryHandler
         from foundry_cli.common.error_serializer import ErrorSerializer
@@ -770,7 +787,7 @@ class TestIntegration_TC:
 
         # Log entry on stderr
         logger.warning("Pipeline completed with error", extra={"op": "pipeline", "exit_code": code})
-        stderr_output = stderr_capture.getvalue()
+        stderr_output = capfd.readouterr().err
         assert "Pipeline completed with error" in stderr_output or "msg" in stderr_output
 
 
@@ -786,7 +803,7 @@ class TestNonFunctional_TC:
         from foundry_cli.common.retry import RetryHandler
         import requests
 
-        handler = RetryHandler(max_retries=3, base_delay=0.1, jitter=False)
+        handler = RetryHandler(max_retries=3, base_delay=100.0, jitter=False)
 
         async def always_fail():
             raise requests.RequestException("fail")

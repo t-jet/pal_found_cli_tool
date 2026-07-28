@@ -38,10 +38,8 @@ from foundry_cli.common.error_serializer import EXIT_CONFIGURATION
 
 @pytest.fixture(autouse=True)
 def reset_async_client_factory():
-    """Reset AsyncClientFactory singleton before/after each test."""
-    AsyncClientFactory.reset()
+    """Keep the legacy fixture name; AsyncClientFactory is stateless now."""
     yield
-    AsyncClientFactory.reset()
 
 
 @pytest.fixture
@@ -303,7 +301,7 @@ class TestAuthProviderIntegration:
         """Given valid token and hostname, When get_auth() called,
         Then it returns a UserTokenAuth instance constructed with the token."""
         _, mock_uta, _ = mock_sdk
-        auth = AuthProvider.get_auth("test_token", "https://foundry.example.com")
+        auth = AuthProvider.get_auth("test_token")
         # Verify UserTokenAuth was constructed with correct token
         mock_uta.assert_called_once_with("test_token")
         assert auth is not None
@@ -314,7 +312,7 @@ class TestAuthProviderIntegration:
         Then raises ConfigurationError."""
         with patch.dict(sys.modules, {"foundry_sdk": None}):
             with pytest.raises(ConfigurationError, match="foundry-sdk not installed"):
-                AuthProvider.get_auth("token", "hostname")
+                AuthProvider.get_auth("token")
 
 
 # ===========================================================================
@@ -353,7 +351,7 @@ class TestAsyncClientFactoryIntegration:
     # TC-ACF-INT-003: create() with attribution enabled injects attribution_rids
     def test_TC_ACF_INT_003_create_with_attribution(self, clean_env, monkeypatch, mock_sdk):
         """Given config with attribution enabled, When factory.create() called,
-        Then attribution_rids are passed to FoundryClient."""
+        Then attribution RIDs are set on the SDK context variable."""
         monkeypatch.setenv("FOUNDRY_TOKEN", "test_token")
         monkeypatch.setenv("FOUNDRY_HOSTNAME", "https://foundry.example.com")
         monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_ENABLE_ATTRIBUTION", "true")
@@ -364,8 +362,8 @@ class TestAsyncClientFactoryIntegration:
         factory = AsyncClientFactory()
         client = factory.create(cfg)
         call_kwargs = mock_fc.call_args[1]
-        assert "attribution_rids" in call_kwargs
-        assert call_kwargs["attribution_rids"] == ["rid1", "rid2", "rid3"]
+        assert "attribution_rids" not in call_kwargs
+        mock_sdk_mod.ATTRIBUTION_VAR.set.assert_called_once_with(["rid1", "rid2", "rid3"])
 
     # TC-ACF-INT-004: create() without attribution does NOT inject attribution_rids
     def test_TC_ACF_INT_004_create_without_attribution(self, clean_env, monkeypatch, mock_sdk):
@@ -382,41 +380,41 @@ class TestAsyncClientFactoryIntegration:
         call_kwargs = mock_fc.call_args[1]
         assert "attribution_rids" not in call_kwargs
 
-    # TC-ACF-INT-005: get() returns cached instance
-    def test_TC_ACF_INT_005_get_returns_cached(self, clean_env, monkeypatch, mock_sdk):
-        """Given a client was created, When factory.get() called,
-        Then returns the cached instance."""
+    # TC-ACF-INT-005: create() is stateless per invocation
+    def test_TC_ACF_INT_005_create_returns_fresh_client(self, clean_env, monkeypatch, mock_sdk):
+        """Given a client was created, When create() is called again,
+        Then a fresh SDK client is constructed."""
         monkeypatch.setenv("FOUNDRY_TOKEN", "test_token")
         monkeypatch.setenv("FOUNDRY_HOSTNAME", "https://foundry.example.com")
         cfg = ConfigLoader()
         cfg.load()
         mock_sdk_mod, mock_uta, mock_fc = mock_sdk
+        mock_fc.side_effect = [MagicMock(name="client1"), MagicMock(name="client2")]
         factory = AsyncClientFactory()
         client1 = factory.create(cfg)
-        client2 = factory.get()
-        assert client1 is client2
+        client2 = factory.create(cfg)
+        assert client1 is not client2
+        assert mock_fc.call_count == 2
 
-    # TC-ACF-INT-006: get() returns None before create
-    def test_TC_ACF_INT_006_get_before_create(self):
-        """Given no client was created, When factory.get() called,
-        Then returns None."""
+    # TC-ACF-INT-006: last_client returns None before create
+    def test_TC_ACF_INT_006_last_client_before_create(self):
+        """Given no client was created, When last_client is read,
+        Then it returns None."""
         factory = AsyncClientFactory()
-        assert factory.get() is None
+        assert factory.last_client is None
 
-    # TC-ACF-INT-007: reset() clears cached instance
-    def test_TC_ACF_INT_007_reset_clears_cache(self, clean_env, monkeypatch, mock_sdk):
-        """Given a cached client, When factory.reset() called,
-        Then get() returns None."""
+    # TC-ACF-INT-007: last_client exposes the most recent client
+    def test_TC_ACF_INT_007_last_client_tracks_latest(self, clean_env, monkeypatch, mock_sdk):
+        """Given a client was created, When last_client is read,
+        Then it returns the most recent client."""
         monkeypatch.setenv("FOUNDRY_TOKEN", "test_token")
         monkeypatch.setenv("FOUNDRY_HOSTNAME", "https://foundry.example.com")
         cfg = ConfigLoader()
         cfg.load()
         mock_sdk_mod, mock_uta, mock_fc = mock_sdk
         factory = AsyncClientFactory()
-        factory.create(cfg)
-        assert factory.get() is not None
-        factory.reset()
-        assert factory.get() is None
+        client = factory.create(cfg)
+        assert factory.last_client is client
 
 
 # ===========================================================================
@@ -480,7 +478,7 @@ class TestIntegrationChain:
     # TC-CHAIN-005: Chain with attribution through full pipeline
     def test_TC_CHAIN_005_chain_with_attribution(self, clean_env, monkeypatch, mock_sdk):
         """Given config with attribution enabled, When full chain executed,
-        Then client is created with attribution headers."""
+        Then attribution RIDs are set on the SDK context variable."""
         monkeypatch.setenv("FOUNDRY_TOKEN", "attr_token")
         monkeypatch.setenv("FOUNDRY_HOSTNAME", "https://attr.example.com")
         monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_ENABLE_ATTRIBUTION", "true")
@@ -489,11 +487,12 @@ class TestIntegrationChain:
         cfg.load()
         is_valid, err = AuthProvider.validate(cfg.token, cfg.hostname)
         assert is_valid is True
-        _, _, mock_fc = mock_sdk
+        mock_sdk_mod, _, mock_fc = mock_sdk
         factory = AsyncClientFactory()
         client = factory.create(cfg)
         call_kwargs = mock_fc.call_args[1]
-        assert call_kwargs["attribution_rids"] == ["agent-1", "agent-2"]
+        assert "attribution_rids" not in call_kwargs
+        mock_sdk_mod.ATTRIBUTION_VAR.set.assert_called_once_with(["agent-1", "agent-2"])
 
 
 # ===========================================================================
