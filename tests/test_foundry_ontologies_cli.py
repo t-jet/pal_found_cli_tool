@@ -13,7 +13,13 @@ _SRC = Path(__file__).parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-_SKILL_DIR = Path(__file__).parent.parent / ".claude" / "skills" / "foundry-ontologies" / "scripts"
+_SKILL_DIR = (
+    Path(__file__).parent.parent
+    / ".claude"
+    / "skills"
+    / "foundry-ontologies"
+    / "scripts"
+)
 sys.path.insert(0, str(_SKILL_DIR))
 
 foundry_ontologies_cli = importlib.import_module("foundry_ontologies_cli")
@@ -42,7 +48,15 @@ def _ns(**kwargs):
 def _value_for(name):
     if name == "content_length":
         return 123
-    if name in {"requests", "parameters", "options", "overrides", "request", "object_set", "links"}:
+    if name in {
+        "requests",
+        "parameters",
+        "options",
+        "overrides",
+        "request",
+        "object_set",
+        "links",
+    }:
         return '{"x": 1}'
     if name in {
         "select",
@@ -105,7 +119,10 @@ def _mock_root():
 
 
 def test_operation_catalog_has_67_unique_operations():
-    paths = {(spec["resource"], spec["operation"]) for spec in foundry_ontologies_cli.OP_SPECS}
+    paths = {
+        (spec["resource"], spec["operation"])
+        for spec in foundry_ontologies_cli.OP_SPECS
+    }
     assert len(foundry_ontologies_cli.OP_SPECS) == 67
     assert len(paths) == 67
 
@@ -138,19 +155,33 @@ async def test_invoke_dispatches_every_canonical_operation(spec, tmp_path):
     if spec["binary_download"]:
         method.return_value = b"payload"
         handler = MagicMock()
-        handler.save = AsyncMock(return_value=MagicMock(to_dict=lambda: {"file_path": "x", "file_size": 7}))
+        handler.save = AsyncMock(
+            return_value=MagicMock(to_dict=lambda: {"file_path": "x", "file_size": 7})
+        )
         monkeypatch = pytest.MonkeyPatch()
-        monkeypatch.setattr(foundry_ontologies_cli, "BinaryDownloadHandler", lambda config=None: handler)
+        monkeypatch.setattr(
+            foundry_ontologies_cli, "BinaryDownloadHandler", lambda config=None: handler
+        )
         try:
             result = await foundry_ontologies_cli._invoke(
-                spec["resource"], spec["operation"], client, args, timeout=5, cfg=MagicMock()
+                spec["resource"],
+                spec["operation"],
+                client,
+                args,
+                timeout=5,
+                cfg=MagicMock(),
             )
         finally:
             monkeypatch.undo()
         assert result["file_size"] == 7
     else:
         await foundry_ontologies_cli._invoke(
-            spec["resource"], spec["operation"], client, args, timeout=5, cfg=MagicMock()
+            spec["resource"],
+            spec["operation"],
+            client,
+            args,
+            timeout=5,
+            cfg=MagicMock(),
         )
     assert method.await_count == 1
     assert method.call_args.kwargs["request_timeout"] == 5
@@ -163,9 +194,18 @@ def test_get_client_routes_nested_and_root_clients(monkeypatch):
     factory.create.return_value = sdk
     cfg = MagicMock()
 
-    assert foundry_ontologies_cli._get_client(cfg, "action", factory) == sdk.ontologies.Action
-    assert foundry_ontologies_cli._get_client(cfg, "action_type", factory) == sdk.ontologies.Ontology.ActionType
-    assert foundry_ontologies_cli._get_client(cfg, "query_type", factory) == sdk.ontologies.Ontology.QueryType
+    assert (
+        foundry_ontologies_cli._get_client(cfg, "action", factory)
+        == sdk.ontologies.Action
+    )
+    assert (
+        foundry_ontologies_cli._get_client(cfg, "action_type", factory)
+        == sdk.ontologies.Ontology.ActionType
+    )
+    assert (
+        foundry_ontologies_cli._get_client(cfg, "query_type", factory)
+        == sdk.ontologies.Ontology.QueryType
+    )
 
 
 def test_paginated_catalog_uses_page_size_and_token_specs():
@@ -182,10 +222,12 @@ def test_paginated_catalog_uses_page_size_and_token_specs():
 @pytest.mark.asyncio
 async def test_invoke_paginated_batches_pages():
     client = MagicMock()
-    client.list = AsyncMock(side_effect=[
-        {"items": [{"id": 1}], "next_page_token": "next"},
-        {"items": [{"id": 2}]},
-    ])
+    client.list = AsyncMock(
+        side_effect=[
+            {"items": [{"id": 1}], "next_page_token": "next"},
+            {"items": [{"id": 2}]},
+        ]
+    )
     args = _ns(ontology="ont", object_type="obj", page_size=1, page_token=None)
     helper = foundry_ontologies_cli.PaginationHelper(page_size=1, batch_pages=2)
 
@@ -231,7 +273,9 @@ async def test_binary_upload_reads_body_file_and_sets_attachment_headers(tmp_pat
         content_type=None,
     )
 
-    await foundry_ontologies_cli._invoke("attachment", "upload", client, args, 8, MagicMock())
+    await foundry_ontologies_cli._invoke(
+        "attachment", "upload", client, args, 8, MagicMock()
+    )
 
     assert client.upload.call_args.args == (b"abc",)
     assert client.upload.call_args.kwargs["content_length"] == 3
@@ -251,7 +295,9 @@ async def test_attachment_upload_requires_filename(tmp_path):
     )
 
     with pytest.raises(ValueError, match="filename is required"):
-        await foundry_ontologies_cli._invoke("attachment", "upload", client, args, 8, MagicMock())
+        await foundry_ontologies_cli._invoke(
+            "attachment", "upload", client, args, 8, MagicMock()
+        )
 
 
 @pytest.mark.asyncio
@@ -260,10 +306,14 @@ async def test_media_upload_does_not_send_attachment_headers(tmp_path):
     client.upload = AsyncMock(return_value={"rid": "m"})
     body_file = tmp_path / "m.bin"
     body_file.write_bytes(b"abc")
-    spec = foundry_ontologies_cli.OPERATION_BY_RESOURCE["media_reference_property"]["upload"]
+    spec = foundry_ontologies_cli.OPERATION_BY_RESOURCE["media_reference_property"][
+        "upload"
+    ]
     args = _args_for(spec, body_file=str(body_file))
 
-    await foundry_ontologies_cli._invoke("media_reference_property", "upload", client, args, 8, MagicMock())
+    await foundry_ontologies_cli._invoke(
+        "media_reference_property", "upload", client, args, 8, MagicMock()
+    )
 
     assert "content_length" not in client.upload.call_args.kwargs
     assert "content_type" not in client.upload.call_args.kwargs
@@ -274,8 +324,12 @@ async def test_binary_download_uses_handler(monkeypatch):
     client = MagicMock()
     client.read = AsyncMock(return_value=b"abc")
     handler = MagicMock()
-    handler.save = AsyncMock(return_value=MagicMock(to_dict=lambda: {"file_path": "x", "file_size": 3}))
-    monkeypatch.setattr(foundry_ontologies_cli, "BinaryDownloadHandler", lambda config=None: handler)
+    handler.save = AsyncMock(
+        return_value=MagicMock(to_dict=lambda: {"file_path": "x", "file_size": 3})
+    )
+    monkeypatch.setattr(
+        foundry_ontologies_cli, "BinaryDownloadHandler", lambda config=None: handler
+    )
 
     result = await foundry_ontologies_cli._invoke(
         "attachment", "read", client, _ns(attachment_rid="rid"), 4, MagicMock()
@@ -296,7 +350,9 @@ async def test_binary_download_accepts_sync_chunk_iterator(monkeypatch):
             saved["chunks"] = [chunk async for chunk in stream]
             return MagicMock(to_dict=lambda: {"file_size": 2})
 
-    monkeypatch.setattr(foundry_ontologies_cli, "BinaryDownloadHandler", lambda config=None: Handler())
+    monkeypatch.setattr(
+        foundry_ontologies_cli, "BinaryDownloadHandler", lambda config=None: Handler()
+    )
 
     result = await foundry_ontologies_cli._invoke(
         "attachment", "read", client, _ns(attachment_rid="rid"), 4, MagicMock()
@@ -317,9 +373,12 @@ async def test_main_success_uses_acl_retry_output_and_b3_scope(monkeypatch, caps
             class Scope:
                 def __enter__(self):
                     entered["scope"] = True
+
                 def __exit__(self, exc_type, exc, tb):
                     return False
+
             return Scope()
+
         def create(self, cfg):
             sdk = MagicMock()
             sdk.ontologies.Ontology = client
@@ -328,6 +387,7 @@ async def test_main_success_uses_acl_retry_output_and_b3_scope(monkeypatch, caps
     class Cfg:
         timeout_s = 30
         log_level = "INFO"
+
         def load(self):
             return None
 
@@ -336,10 +396,14 @@ async def test_main_success_uses_acl_retry_output_and_b3_scope(monkeypatch, caps
     retry.execute = AsyncMock(return_value={"rid": "x"})
     monkeypatch.setattr(foundry_ontologies_cli, "ConfigLoader", Cfg)
     monkeypatch.setattr(foundry_ontologies_cli, "LogSetup", MagicMock())
-    monkeypatch.setattr(foundry_ontologies_cli, "AccessControlGuard", lambda cfg, ns: guard)
+    monkeypatch.setattr(
+        foundry_ontologies_cli, "AccessControlGuard", lambda cfg, ns: guard
+    )
     monkeypatch.setattr(foundry_ontologies_cli, "AsyncClientFactory", Factory)
     monkeypatch.setattr(foundry_ontologies_cli, "RetryHandler", lambda: retry)
-    monkeypatch.setattr(sys, "argv", ["prog", "ontology", "get", "ontology-rid", "--format", "json"])
+    monkeypatch.setattr(
+        sys, "argv", ["prog", "ontology", "get", "ontology-rid", "--format", "json"]
+    )
 
     rc = await foundry_ontologies_cli.main()
 
@@ -355,6 +419,7 @@ async def test_main_acl_denied_returns_exit_8(monkeypatch):
     class Cfg:
         timeout_s = 30
         log_level = "INFO"
+
         def load(self):
             return None
 
@@ -363,7 +428,11 @@ async def test_main_acl_denied_returns_exit_8(monkeypatch):
     monkeypatch.setattr(
         foundry_ontologies_cli,
         "AccessControlGuard",
-        lambda cfg, ns: MagicMock(check=MagicMock(side_effect=foundry_ontologies_cli.AccessControlError("blocked"))),
+        lambda cfg, ns: MagicMock(
+            check=MagicMock(
+                side_effect=foundry_ontologies_cli.AccessControlError("blocked")
+            )
+        ),
     )
     monkeypatch.setattr(sys, "argv", ["prog", "ontology", "get", "ontology-rid"])
 
@@ -401,7 +470,9 @@ async def test_main_user_input_error_returns_exit_1(monkeypatch):
     retry.execute = AsyncMock(side_effect=ValueError("filename is required"))
     monkeypatch.setattr(foundry_ontologies_cli, "ConfigLoader", Cfg)
     monkeypatch.setattr(foundry_ontologies_cli, "LogSetup", MagicMock())
-    monkeypatch.setattr(foundry_ontologies_cli, "AccessControlGuard", lambda cfg, ns: MagicMock())
+    monkeypatch.setattr(
+        foundry_ontologies_cli, "AccessControlGuard", lambda cfg, ns: MagicMock()
+    )
     monkeypatch.setattr(foundry_ontologies_cli, "AsyncClientFactory", Factory)
     monkeypatch.setattr(foundry_ontologies_cli, "RetryHandler", lambda: retry)
     monkeypatch.setattr(sys, "argv", ["prog", "attachment", "upload"])
@@ -425,6 +496,7 @@ async def test_main_error_serialization_paths(monkeypatch, exc, exit_code):
     class Cfg:
         timeout_s = 30
         log_level = "INFO"
+
         def load(self):
             return None
 
@@ -433,9 +505,12 @@ async def test_main_error_serialization_paths(monkeypatch, exc, exit_code):
             class Scope:
                 def __enter__(self):
                     return None
+
                 def __exit__(self, exc_type, exc, tb):
                     return False
+
             return Scope()
+
         def create(self, cfg):
             sdk = MagicMock()
             sdk.ontologies.Ontology = MagicMock()
@@ -445,7 +520,9 @@ async def test_main_error_serialization_paths(monkeypatch, exc, exit_code):
     retry.execute = AsyncMock(side_effect=exc)
     monkeypatch.setattr(foundry_ontologies_cli, "ConfigLoader", Cfg)
     monkeypatch.setattr(foundry_ontologies_cli, "LogSetup", MagicMock())
-    monkeypatch.setattr(foundry_ontologies_cli, "AccessControlGuard", lambda cfg, ns: MagicMock())
+    monkeypatch.setattr(
+        foundry_ontologies_cli, "AccessControlGuard", lambda cfg, ns: MagicMock()
+    )
     monkeypatch.setattr(foundry_ontologies_cli, "AsyncClientFactory", Factory)
     monkeypatch.setattr(foundry_ontologies_cli, "RetryHandler", lambda: retry)
     monkeypatch.setattr(sys, "argv", ["prog", "ontology", "get", "ontology-rid"])
@@ -456,23 +533,36 @@ async def test_main_error_serialization_paths(monkeypatch, exc, exit_code):
 
 
 def test_skill_text_is_b3_only():
-    text = (Path(__file__).parent.parent / ".claude" / "skills" / "foundry-ontologies" / "SKILL.md").read_text()
+    text = (
+        Path(__file__).parent.parent
+        / ".claude"
+        / "skills"
+        / "foundry-ontologies"
+        / "SKILL.md"
+    ).read_text()
     assert "B3" in text
     assert "W3C" not in text
 
 
 def test_output_formatter_supports_json_and_toon():
-    json_out = foundry_ontologies_cli.OutputFormatter(format_setting="json").format({"key": "value"})
-    toon_out = foundry_ontologies_cli.OutputFormatter(format_setting="auto").format([
-        {"a": 1, "b": 2},
-        {"a": 3, "b": 4},
-    ])
+    json_out = foundry_ontologies_cli.OutputFormatter(format_setting="json").format(
+        {"key": "value"}
+    )
+    toon_out = foundry_ontologies_cli.OutputFormatter(format_setting="auto").format(
+        [
+            {"a": 1, "b": 2},
+            {"a": 3, "b": 4},
+        ]
+    )
     assert '"key": "value"' in json_out
     assert "a" in toon_out and "b" in toon_out
 
 
 def test_resolve_converts_kebab_to_snake():
-    assert foundry_ontologies_cli._resolve("object-type", "get-full-metadata") == "get_full_metadata"
+    assert (
+        foundry_ontologies_cli._resolve("object-type", "get-full-metadata")
+        == "get_full_metadata"
+    )
 
 
 if __name__ == "__main__":

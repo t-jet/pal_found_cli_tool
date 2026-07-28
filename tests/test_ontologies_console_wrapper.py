@@ -8,7 +8,10 @@ from foundry_cli.ontologies.scripts import foundry_ontologies_cli
 
 def test_packaged_module_exposes_operation_catalog():
     assert len(foundry_ontologies_cli.OP_SPECS) == 67
-    assert foundry_ontologies_cli.OPERATION_BY_RESOURCE["ontology"]["get"]["method"] == "get"
+    assert (
+        foundry_ontologies_cli.OPERATION_BY_RESOURCE["ontology"]["get"]["method"]
+        == "get"
+    )
 
 
 def test_console_main_runs_async_main(monkeypatch):
@@ -52,10 +55,14 @@ async def test_packaged_main_success(monkeypatch, capsys):
     retry.execute = AsyncMock(return_value={"rid": "x"})
     monkeypatch.setattr(foundry_ontologies_cli, "ConfigLoader", Cfg)
     monkeypatch.setattr(foundry_ontologies_cli, "LogSetup", MagicMock())
-    monkeypatch.setattr(foundry_ontologies_cli, "AccessControlGuard", lambda cfg, ns: MagicMock())
+    monkeypatch.setattr(
+        foundry_ontologies_cli, "AccessControlGuard", lambda cfg, ns: MagicMock()
+    )
     monkeypatch.setattr(foundry_ontologies_cli, "AsyncClientFactory", Factory)
     monkeypatch.setattr(foundry_ontologies_cli, "RetryHandler", lambda: retry)
-    monkeypatch.setattr(sys, "argv", ["prog", "ontology", "get", "ontology-rid", "--format", "json"])
+    monkeypatch.setattr(
+        sys, "argv", ["prog", "ontology", "get", "ontology-rid", "--format", "json"]
+    )
 
     rc = await foundry_ontologies_cli.main()
 

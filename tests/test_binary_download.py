@@ -90,7 +90,9 @@ async def test_unknown_length_reaches_eof_without_false_truncation(
     assert result.truncated is expected_truncated
     assert result.source_size == expected_source
     assert result.source_size_at_least is None
-    assert result.checksum_md5 == hashlib.md5(payload, usedforsecurity=False).hexdigest()
+    assert (
+        result.checksum_md5 == hashlib.md5(payload, usedforsecurity=False).hexdigest()
+    )
     assert result.checksum_sha256 == hashlib.sha256(payload).hexdigest()
     assert stream.closed is True
 
@@ -172,7 +174,9 @@ async def test_unsafe_filename_is_rejected_before_root_creation(
 
 
 @pytest.mark.asyncio
-async def test_invalid_limit_fails_before_stream_or_filesystem_use(tmp_path: Path) -> None:
+async def test_invalid_limit_fails_before_stream_or_filesystem_use(
+    tmp_path: Path,
+) -> None:
     root = tmp_path / "downloads"
     stream = ChunkStream([b"data"])
 
@@ -185,7 +189,9 @@ async def test_invalid_limit_fails_before_stream_or_filesystem_use(tmp_path: Pat
 
 
 @pytest.mark.asyncio
-async def test_stream_failure_removes_partial_and_temporary_files(tmp_path: Path) -> None:
+async def test_stream_failure_removes_partial_and_temporary_files(
+    tmp_path: Path,
+) -> None:
     handler = BinaryDownloadHandler(tmp_path, max_download_bytes=20)
     stream = ChunkStream([b"partial"], error_after=1)
 
@@ -246,7 +252,9 @@ async def test_download_dir_permissions_are_umask_independent_on_posix(
         real_chmod(path, mode)
 
     monkeypatch.setattr(os, "chmod", recording_chmod)
-    monkeypatch.setattr("foundry_cli.common.binary_download_handler.os.chmod", recording_chmod)
+    monkeypatch.setattr(
+        "foundry_cli.common.binary_download_handler.os.chmod", recording_chmod
+    )
 
     await _save(handler, ChunkStream([b"payload"]))
 
@@ -255,7 +263,8 @@ async def test_download_dir_permissions_are_umask_independent_on_posix(
     if os.name != "nt":
         uuid_parents = {str(Path(p).resolve()) for p, _ in chmod_calls}
         download_dirs = {
-            p for p in uuid_parents
+            p
+            for p in uuid_parents
             if tmp_path.resolve() == Path(p).parent.resolve()
             and Path(p).name != tmp_path.name
         }
