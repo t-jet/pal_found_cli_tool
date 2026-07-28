@@ -24,6 +24,7 @@ dev = [
 
 [project.scripts]
 foundry-datasets = "foundry_cli.datasets.scripts.foundry_datasets_cli:main"
+foundry-ontologies = "foundry_cli.ontologies.scripts.foundry_ontologies_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
