@@ -26,7 +26,6 @@ import os
 import sys
 import traceback
 import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Type
 
 logger = logging.getLogger(__name__)
@@ -307,11 +306,15 @@ class ErrorSerializer:
         if http_exit is not None:
             exit_code = http_exit
         else:
+            declared_exit_code = getattr(exception, "exit_code", None)
+            if isinstance(declared_exit_code, int) and declared_exit_code in EXIT_CODE_NAMES:
+                exit_code = declared_exit_code
             # Walk MRO for exception type matching
-            for klass in type(exception).__mro__:
-                if klass in _EXCEPTION_TO_EXIT_CODE:
-                    exit_code = _EXCEPTION_TO_EXIT_CODE[klass]
-                    break
+            else:
+                for klass in type(exception).__mro__:
+                    if klass in _EXCEPTION_TO_EXIT_CODE:
+                        exit_code = _EXCEPTION_TO_EXIT_CODE[klass]
+                        break
 
         exit_code_name = EXIT_CODE_NAMES.get(exit_code, "UnknownError")
 
@@ -346,6 +349,17 @@ class ErrorSerializer:
         http_status = self._get_http_status_from_exception(exception)
         if http_status is not None:
             error_envelope["http_status"] = http_status
+
+        diagnostic_metadata = getattr(exception, "diagnostic_metadata", None)
+        if isinstance(diagnostic_metadata, dict):
+            safe_keys = {"session_id", "source_size", "source_size_at_least"}
+            safe_metadata = {
+                key: value
+                for key, value in diagnostic_metadata.items()
+                if key in safe_keys and isinstance(value, (str, int, float, bool, type(None)))
+            }
+            if safe_metadata:
+                error_envelope["details"] = safe_metadata
 
         if print_to_stdout:
             json_str = json.dumps(error_envelope, default=str)

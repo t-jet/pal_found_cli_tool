@@ -71,12 +71,12 @@ class AuthProvider:
         Raises
         ------
         ConfigurationError
-            If the ``foundry-sdk`` package is not installed.
+            If the ``foundry-platform-sdk`` package is not installed.
         """
         try:
             from foundry_sdk import UserTokenAuth
         except ImportError as exc:
             raise ConfigurationError(
-                "foundry-sdk not installed; run 'pip install foundry-platform-python'"
+                "foundry-sdk not installed; run 'pip install foundry-platform-sdk'"
             ) from exc
         return UserTokenAuth(token)

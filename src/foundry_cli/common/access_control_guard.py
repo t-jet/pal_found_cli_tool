@@ -30,18 +30,49 @@ logger = logging.getLogger(__name__)
 
 # Write operations — heuristic: operations whose name contains known write verbs
 # are classified as writes; all others are reads.
-_WRITE_VERBS = frozenset({
-    "create", "delete", "put", "post", "patch", "replace", "update",
-    "add", "remove", "commit", "abort", "upload", "download", "modify", "upsert",
-    "cancel", "revoke", "preregister", "execute", "apply",
-    "blocking_continue", "streaming_continue", "rag_context",
-})
+_WRITE_VERBS = frozenset(
+    {
+        "create",
+        "delete",
+        "put",
+        "post",
+        "patch",
+        "replace",
+        "update",
+        "add",
+        "remove",
+        "commit",
+        "abort",
+        "upload",
+        "download",
+        "modify",
+        "upsert",
+        "cancel",
+        "revoke",
+        "preregister",
+        "execute",
+        "apply",
+        "publish",
+        "deploy",
+        "run",
+        "transform",
+        "clear",
+        "build",
+        "blocking_continue",
+        "streaming_continue",
+        "rag_context",
+    }
+)
 
 # Read-only metadata operations that are permitted even in METADATA_ONLY tier
 # when NOT in the allow-list file (these are the minimal structural metadata)
-_METADATA_VERBS = frozenset({
-    "get", "list", "search",
-})
+_METADATA_VERBS = frozenset(
+    {
+        "get",
+        "list",
+        "search",
+    }
+)
 
 
 class AccessControlError(Exception):
@@ -124,15 +155,27 @@ class AccessControlGuard:
         return False
 
     def _operation_env_key(self, resource: str, operation: str) -> str:
-        """Build canonical env key suffix for an operation."""
-        op_lower = operation.lower()
-        for verb in _WRITE_VERBS | _METADATA_VERBS:
-            if op_lower == verb:
-                return f"{self.namespace}_{resource.upper()}_{verb.upper()}"
-            prefix = verb + "_"
-            if op_lower.startswith(prefix):
-                object_name = op_lower[len(prefix):]
-                return f"{self.namespace}_{object_name.upper()}_{verb.upper()}"
+        """Build canonical env key suffix for an operation.
+
+        Follows the canonical transformation rule (SRS §5.2): the entire
+        SDK path ``{ns}.{resource}.{operation}`` is uppercased and joined
+        with underscores, keeping the operation name verbatim (NOT
+        reordered by verb). This ensures ``put_schema`` maps to
+        ``DATASETS_DATASET_PUT_SCHEMA``, matching the canonical env-var
+        reference table and the Step-3 ``_READONLY=false`` override.
+
+        Parameters
+        ----------
+        resource : str
+            Resource/class name (e.g., "dataset").
+        operation : str
+            Operation name (e.g., "put_schema", "get").
+
+        Returns
+        -------
+        str
+            Env key suffix such as ``DATASETS_DATASET_PUT_SCHEMA``.
+        """
         return f"{self.namespace}_{resource.upper()}_{operation.upper()}"
 
     @staticmethod
@@ -238,7 +281,9 @@ class AccessControlGuard:
             allowlist_path = Path(self._metadata_allowlist_path)
         else:
             # Default: look for metadata-allow-list.md in .ept/docs
-            allowlist_path = Path(".ept/docs/deliverables/architecture/metadata-allow-list.md")
+            allowlist_path = Path(
+                ".ept/docs/deliverables/architecture/metadata-allow-list.md"
+            )
 
         if not allowlist_path.exists():
             return set()
@@ -247,7 +292,6 @@ class AccessControlGuard:
         canonical_row = re.compile(
             r"^\|\s*`(?P<sdk_path>[a-z0-9_]+\.[a-z0-9_]+\.[a-z0-9_]+)`\s*"
             r"\|\s*PERMITTED\s*\|",
-            re.IGNORECASE,
         )
         text = allowlist_path.read_text(encoding="utf-8")
         for line in text.splitlines():
@@ -301,7 +345,9 @@ class AccessControlGuard:
         is_write = self._is_write_operation(operation)
         op_path = f"{self.namespace.lower()}.{resource.lower()}.{operation.lower()}"
 
-        def _blocked(message: str, step: int, env_var: str, value: str) -> AccessControlError:
+        def _blocked(
+            message: str, step: int, env_var: str, value: str
+        ) -> AccessControlError:
             return AccessControlError(
                 message,
                 step=step,
@@ -318,8 +364,9 @@ class AccessControlGuard:
         enabled_env = f"FOUNDRY_AGENTIC_CLI_{full_key}_ENABLED"
         enabled_val = os.environ.get(enabled_env)
         if enabled_val is not None and enabled_val.lower() == "false":
-            self._log_decision("BLOCKED", resource, operation, 1,
-                               f"ENABLED=false for {full_key}")
+            self._log_decision(
+                "BLOCKED", resource, operation, 1, f"ENABLED=false for {full_key}"
+            )
             raise _blocked(
                 f"Operation blocked: ENABLED=false for {full_key}",
                 1,
@@ -331,8 +378,9 @@ class AccessControlGuard:
         ns_enabled_env = f"FOUNDRY_AGENTIC_CLI_{self.namespace}_ENABLED"
         ns_enabled_val = os.environ.get(ns_enabled_env)
         if ns_enabled_val is not None and ns_enabled_val.lower() == "false":
-            self._log_decision("BLOCKED", resource, operation, 2,
-                               f"ENABLED=false for {self.namespace}")
+            self._log_decision(
+                "BLOCKED", resource, operation, 2, f"ENABLED=false for {self.namespace}"
+            )
             raise _blocked(
                 f"Namespace blocked: ENABLED=false for {self.namespace}",
                 2,
@@ -361,8 +409,11 @@ class AccessControlGuard:
                 op_readonly_val = os.environ.get(op_readonly_env)
                 if op_readonly_val is not None and op_readonly_val.lower() == "false":
                     self._log_decision(
-                        "PERMITTED", resource, operation, 3,
-                        f"READONLY=false override for {full_key}"
+                        "PERMITTED",
+                        resource,
+                        operation,
+                        3,
+                        f"READONLY=false override for {full_key}",
                     )
                     return  # Explicit write permit for this operation
 
@@ -371,15 +422,21 @@ class AccessControlGuard:
                 ns_readonly_val = os.environ.get(ns_readonly_env)
                 if ns_readonly_val is not None and ns_readonly_val.lower() == "false":
                     self._log_decision(
-                        "PERMITTED", resource, operation, 4,
-                        f"READONLY=false override for {self.namespace}"
+                        "PERMITTED",
+                        resource,
+                        operation,
+                        4,
+                        f"READONLY=false override for {self.namespace}",
                     )
                     return  # Explicit write permit for this namespace
 
                 if self._get_namespace_readonly():
                     self._log_decision(
-                        "BLOCKED", resource, operation, 4,
-                        f"READONLY=true for {self.namespace}"
+                        "BLOCKED",
+                        resource,
+                        operation,
+                        4,
+                        f"READONLY=true for {self.namespace}",
                     )
                     raise _blocked(
                         "Operation blocked: namespace read-only mode active",
@@ -391,8 +448,11 @@ class AccessControlGuard:
             # Step 5: Global READONLY
             if self._get_global_readonly():
                 self._log_decision(
-                    "BLOCKED", resource, operation, 5,
-                    "Global READONLY=true blocks write"
+                    "BLOCKED",
+                    resource,
+                    operation,
+                    5,
+                    "Global READONLY=true blocks write",
                 )
                 raise _blocked(
                     "Operation blocked: read-only mode active",
@@ -404,18 +464,24 @@ class AccessControlGuard:
         # Steps 6-7: METADATA_ONLY evaluation.
         if global_metadata_only and namespace_metadata_override:
             self._log_decision(
-                "PERMITTED", resource, operation, 6,
-                f"METADATA_ONLY=false override for {self.namespace}"
+                "PERMITTED",
+                resource,
+                operation,
+                6,
+                f"METADATA_ONLY=false override for {self.namespace}",
             )
             return
 
         if metadata_only_active:
-            metadata_env = ns_metadata_env if namespace_metadata_only else "FOUNDRY_AGENTIC_CLI_METADATA_ONLY"
+            metadata_env = (
+                ns_metadata_env
+                if namespace_metadata_only
+                else "FOUNDRY_AGENTIC_CLI_METADATA_ONLY"
+            )
             if is_write:
                 step = 6 if namespace_metadata_only else 7
                 self._log_decision(
-                    "BLOCKED", resource, operation, 7,
-                    "METADATA_ONLY=true blocks write"
+                    "BLOCKED", resource, operation, 7, "METADATA_ONLY=true blocks write"
                 )
                 raise _blocked(
                     "Operation blocked: metadata-only mode active",
@@ -423,13 +489,13 @@ class AccessControlGuard:
                     metadata_env,
                     "true",
                 )
-            if (
-                not self._is_metadata_operation(resource, operation)
-                and not self._is_in_metadata_allowlist(resource, operation)
-            ):
+            if not self._is_in_metadata_allowlist(resource, operation):
                 self._log_decision(
-                    "BLOCKED", resource, operation, 7,
-                    "Operation not in metadata allow-list"
+                    "BLOCKED",
+                    resource,
+                    operation,
+                    7,
+                    "Operation not in metadata allow-list",
                 )
                 raise _blocked(
                     "Operation blocked: not in metadata allow-list",
@@ -439,9 +505,7 @@ class AccessControlGuard:
                 )
 
         # Step 8: Permit
-        self._log_decision(
-            "PERMITTED", resource, operation, 8, "Default full access"
-        )
+        self._log_decision("PERMITTED", resource, operation, 8, "Default full access")
         return
 
     def _is_metadata_operation(self, resource: str, operation: str) -> bool:

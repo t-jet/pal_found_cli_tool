@@ -48,7 +48,12 @@ warn_unused_configs = true
 [tool.coverage.run]
 source = ["foundry_cli"]
 branch = true
-omit = ["tests/*", "**/__pycache__/*"]
+omit = [
+    "tests/*",
+    "**/__pycache__/*",
+    "src/foundry_cli/datasets/scripts/foundry_datasets_cli.py",
+    "src/foundry_cli/ontologies/scripts/foundry_ontologies_cli.py",
+]
 
 [tool.coverage.report]
 show_missing = true

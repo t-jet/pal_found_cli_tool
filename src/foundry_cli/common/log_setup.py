@@ -82,6 +82,14 @@ class _NdJsonFormatter(logging.Formatter):
             "access_decision",
             "http_status",
             "session_alias",
+            "active_session_count",
+            "file_size",
+            "max_download_bytes",
+            "truncated",
+            "source_size",
+            "source_size_at_least",
+            "trace_id",
+            "span_id",
         ]
         for field in optional_fields:
             value = getattr(record, field, None)
