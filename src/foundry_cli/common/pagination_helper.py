@@ -22,7 +22,11 @@ from foundry_cli.common.log_setup import METADATA_SEPARATOR
 
 # Default values (from SRS-001 §5)
 DEFAULT_PAGE_SIZE = int(os.environ.get("FOUNDRY_AGENTIC_CLI_DEFAULT_PAGE_SIZE", "100"))
-MAX_BATCH_PAGES = int(os.environ.get("FOUNDRY_AGENTIC_CLI_MAX_BATCH_PAGES", "40"))
+HARD_MAX_BATCH_PAGES = 40
+MAX_BATCH_PAGES = min(
+    int(os.environ.get("FOUNDRY_AGENTIC_CLI_MAX_BATCH_PAGES", str(HARD_MAX_BATCH_PAGES))),
+    HARD_MAX_BATCH_PAGES,
+)
 
 
 class PaginationHelper:
@@ -50,13 +54,28 @@ class PaginationHelper:
         page_token: Optional[str] = None,
         batch_pages: Optional[int] = None,
     ) -> None:
-        self.page_size = page_size if page_size is not None else DEFAULT_PAGE_SIZE
+        self.page_size = self._validate_positive_int(
+            "page_size",
+            page_size if page_size is not None else DEFAULT_PAGE_SIZE,
+        )
         self.page_token = page_token
-        raw_batch = batch_pages if batch_pages is not None else 1
+        raw_batch = self._validate_positive_int(
+            "batch_pages",
+            batch_pages if batch_pages is not None else 1,
+        )
         self.batch_pages = min(raw_batch, MAX_BATCH_PAGES)
         self._next_page_token: Optional[str] = None
         self._total_items: int = 0
         self._pages_fetched: int = 0
+
+    @staticmethod
+    def _validate_positive_int(name: str, value: int) -> int:
+        """Validate that a pagination argument is a positive integer."""
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError(f"{name} must be a positive integer")
+        if value <= 0:
+            raise ValueError(f"{name} must be a positive integer")
+        return value
 
     @property
     def next_page_token(self) -> Optional[str]:
@@ -122,12 +141,12 @@ class PaginationHelper:
         str or None
             Next page token.
         """
+        if isinstance(response, dict):
+            return response.get("next_page_token") or response.get("nextPageToken")
         if hasattr(response, "next_page_token"):
             return getattr(response, "next_page_token", None)
         if hasattr(response, "nextPageToken"):
             return getattr(response, "nextPageToken", None)
-        if isinstance(response, dict):
-            return response.get("next_page_token") or response.get("nextPageToken")
         return None
 
     async def paginate(
