@@ -1,43 +1,54 @@
-import asyncio
-from types import SimpleNamespace
+import sys
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from foundry_cli.ontologies.scripts import foundry_ontologies_cli
 
 
-@pytest.fixture(autouse=True)
-def restore_default_event_loop():
-    yield
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+def test_packaged_module_exposes_operation_catalog():
+    assert len(foundry_ontologies_cli.OP_SPECS) == 67
+    assert foundry_ontologies_cli.OPERATION_BY_RESOURCE["ontology"]["get"]["method"] == "get"
 
 
-def test_async_main_delegates_to_legacy_cli(monkeypatch):
-    async def fake_main():
-        return 17
+@pytest.mark.asyncio
+async def test_packaged_main_success(monkeypatch, capsys):
+    client = MagicMock()
+    client.get = AsyncMock(return_value={"rid": "x"})
 
-    fake_module = SimpleNamespace(main=fake_main)
-    monkeypatch.setattr(foundry_ontologies_cli, "_load_legacy_cli", lambda: fake_module)
+    class Factory:
+        def invocation_scope(self, cfg):
+            class Scope:
+                def __enter__(self):
+                    return None
 
-    assert asyncio.run(foundry_ontologies_cli.async_main()) == 17
+                def __exit__(self, exc_type, exc, tb):
+                    return False
 
+            return Scope()
 
-def test_main_runs_async_entrypoint(monkeypatch):
-    async def fake_async_main():
-        return 23
+        def create(self, cfg):
+            sdk = MagicMock()
+            sdk.ontologies.Ontology = client
+            return sdk
 
-    monkeypatch.setattr(foundry_ontologies_cli, "async_main", fake_async_main)
+    class Cfg:
+        timeout_s = 30
+        log_level = "INFO"
 
-    assert foundry_ontologies_cli.main() == 23
+        def load(self):
+            return None
 
+    retry = MagicMock()
+    retry.execute = AsyncMock(return_value={"rid": "x"})
+    monkeypatch.setattr(foundry_ontologies_cli, "ConfigLoader", Cfg)
+    monkeypatch.setattr(foundry_ontologies_cli, "LogSetup", MagicMock())
+    monkeypatch.setattr(foundry_ontologies_cli, "AccessControlGuard", lambda cfg, ns: MagicMock())
+    monkeypatch.setattr(foundry_ontologies_cli, "AsyncClientFactory", Factory)
+    monkeypatch.setattr(foundry_ontologies_cli, "RetryHandler", lambda: retry)
+    monkeypatch.setattr(sys, "argv", ["prog", "ontology", "get", "ontology-rid", "--format", "json"])
 
-def test_load_legacy_cli_reports_missing_script(tmp_path, monkeypatch):
-    foundry_ontologies_cli._load_legacy_cli.cache_clear()
-    missing_script = tmp_path / "missing_cli.py"
-    monkeypatch.setattr(foundry_ontologies_cli, "_LEGACY_SCRIPT", missing_script)
+    rc = await foundry_ontologies_cli.main()
 
-    with pytest.raises(ImportError, match="not found"):
-        foundry_ontologies_cli._load_legacy_cli()
-
-    foundry_ontologies_cli._load_legacy_cli.cache_clear()
+    assert rc == foundry_ontologies_cli.EXIT_SUCCESS
+    assert "rid" in capsys.readouterr().out

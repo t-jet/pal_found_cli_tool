@@ -201,6 +201,26 @@ async def test_invoke_paginated_batches_pages():
 
 
 @pytest.mark.asyncio
+async def test_invoke_accepts_nonawaitable_sdk_iterator_result():
+    client = MagicMock()
+    response = {"items": [{"id": 1}], "next_page_token": None}
+    client.list = MagicMock(return_value=response)
+    args = _ns(ontology="ont", object_type="obj", page_size=1, page_token=None)
+
+    result = await foundry_ontologies_cli._invoke(
+        "ontology_object",
+        "list",
+        client,
+        args,
+        timeout=3,
+        cfg=MagicMock(),
+    )
+
+    assert result == response
+    client.list.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_binary_upload_reads_body_file_and_sets_attachment_headers(tmp_path):
     client = MagicMock()
     client.upload = AsyncMock(return_value={"rid": "a"})
@@ -218,6 +238,22 @@ async def test_binary_upload_reads_body_file_and_sets_attachment_headers(tmp_pat
     assert client.upload.call_args.args == (b"abc",)
     assert client.upload.call_args.kwargs["content_length"] == 3
     assert client.upload.call_args.kwargs["content_type"] == "application/octet-stream"
+
+
+@pytest.mark.asyncio
+async def test_attachment_upload_requires_filename(tmp_path):
+    client = MagicMock()
+    client.upload = AsyncMock(return_value={"rid": "a"})
+    body_file = tmp_path / "a.bin"
+    body_file.write_bytes(b"abc")
+    args = _args_for(
+        foundry_ontologies_cli.OPERATION_BY_RESOURCE["attachment"]["upload"],
+        body_file=str(body_file),
+        filename=None,
+    )
+
+    with pytest.raises(ValueError, match="filename is required"):
+        await foundry_ontologies_cli._invoke("attachment", "upload", client, args, 8, MagicMock())
 
 
 @pytest.mark.asyncio
@@ -315,6 +351,45 @@ async def test_main_acl_denied_returns_exit_8(monkeypatch):
     rc = await foundry_ontologies_cli.main()
 
     assert rc == foundry_ontologies_cli.EXIT_ACCESS_CONTROL
+
+
+@pytest.mark.asyncio
+async def test_main_user_input_error_returns_exit_1(monkeypatch):
+    class Cfg:
+        timeout_s = 30
+        log_level = "INFO"
+
+        def load(self):
+            return None
+
+    class Factory:
+        def invocation_scope(self, cfg):
+            class Scope:
+                def __enter__(self):
+                    return None
+
+                def __exit__(self, exc_type, exc, tb):
+                    return False
+
+            return Scope()
+
+        def create(self, cfg):
+            sdk = MagicMock()
+            sdk.ontologies.Attachment = MagicMock()
+            return sdk
+
+    retry = MagicMock()
+    retry.execute = AsyncMock(side_effect=ValueError("filename is required"))
+    monkeypatch.setattr(foundry_ontologies_cli, "ConfigLoader", Cfg)
+    monkeypatch.setattr(foundry_ontologies_cli, "LogSetup", MagicMock())
+    monkeypatch.setattr(foundry_ontologies_cli, "AccessControlGuard", lambda cfg, ns: MagicMock())
+    monkeypatch.setattr(foundry_ontologies_cli, "AsyncClientFactory", Factory)
+    monkeypatch.setattr(foundry_ontologies_cli, "RetryHandler", lambda: retry)
+    monkeypatch.setattr(sys, "argv", ["prog", "attachment", "upload"])
+
+    rc = await foundry_ontologies_cli.main()
+
+    assert rc == foundry_ontologies_cli.EXIT_USER_INPUT
 
 
 @pytest.mark.asyncio
