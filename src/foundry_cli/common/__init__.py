@@ -7,6 +7,27 @@ from foundry_cli.common.log_setup import LogSetup
 from foundry_cli.common.config_loader import ConfigLoader, ConfigurationError
 from foundry_cli.common.auth_provider import AuthProvider
 from foundry_cli.common.async_client_factory import AsyncClientFactory
+from foundry_cli.common.binary_download_handler import (
+    BinaryDownloadHandler,
+    DownloadError,
+    DownloadResult,
+    InvalidDownloadError,
+)
+from foundry_cli.common.session_manager import (
+    InvalidSessionAliasError,
+    SessionAliasConflictError,
+    SessionCorruptionError,
+    SessionError,
+    SessionManager,
+    SessionNotFoundError,
+    SessionPersistenceError,
+    SessionState,
+)
+from foundry_cli.common.tracing_provider import (
+    B3Context,
+    InvalidTraceContextError,
+    TracingProvider,
+)
 
 __all__ = [
     "RetryHandler",
@@ -17,4 +38,19 @@ __all__ = [
     "ConfigurationError",
     "AuthProvider",
     "AsyncClientFactory",
+    "B3Context",
+    "BinaryDownloadHandler",
+    "DownloadError",
+    "DownloadResult",
+    "InvalidDownloadError",
+    "InvalidSessionAliasError",
+    "InvalidTraceContextError",
+    "SessionAliasConflictError",
+    "SessionCorruptionError",
+    "SessionError",
+    "SessionManager",
+    "SessionNotFoundError",
+    "SessionPersistenceError",
+    "SessionState",
+    "TracingProvider",
 ]

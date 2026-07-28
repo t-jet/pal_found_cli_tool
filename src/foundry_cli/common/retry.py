@@ -37,9 +37,12 @@ import random
 import signal
 from contextlib import asynccontextmanager
 from functools import wraps
-from typing import Any, Callable, Optional, Set, Tuple, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Optional, Set, Tuple, Type, TypeVar
 
 import requests
+
+if TYPE_CHECKING:
+    from foundry_cli.common.tracing_provider import B3Context, TracingProvider
 
 logger = logging.getLogger(__name__)
 
@@ -248,7 +251,7 @@ def _calculate_delay(
     delay_s = delay_ms / 1000.0
 
     if jitter:
-        jitter_factor = 1.0 + random.uniform(-0.1, 0.1)
+        jitter_factor = 1.0 + random.uniform(-0.1, 0.1)  # nosec B311 - retry jitter is not security-sensitive.
         delay_s = delay_s * jitter_factor
 
     return delay_s
@@ -479,6 +482,18 @@ class RetryHandler:
                 restore_signals()
 
         raise last_exception  # type: ignore[misc]
+
+    async def execute_traced(
+        self,
+        tracing: "TracingProvider",
+        coro_func: Callable[..., Any],
+        *args: Any,
+        supplied: "B3Context | None" = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Execute every retry attempt under one isolated B3 context."""
+        with tracing.scope(supplied):
+            return await self.execute(coro_func, *args, **kwargs)
 
     def __call__(self, func: F) -> F:
         """Decorator protocol: wrap an async function with retry logic.

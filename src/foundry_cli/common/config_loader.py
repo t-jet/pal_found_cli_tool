@@ -12,7 +12,7 @@ Never searches home directory.
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional, Type, TypeVar
+from typing import Optional, Type, TypeVar
 
 from dotenv import load_dotenv
 
@@ -21,7 +21,7 @@ from foundry_cli.common.log_setup import DEFAULT_LOG_LEVEL, ENV_LOG_LEVEL
 
 # Environment variable names
 ENV_ENV_FILE = "FOUNDRY_AGENTIC_CLI_ENV_FILE"
-ENV_TOKEN = "FOUNDRY_TOKEN"
+ENV_TOKEN = "FOUNDRY_TOKEN"  # nosec B105 - environment variable name, not a secret value.
 ENV_HOSTNAME = "FOUNDRY_HOSTNAME"
 ENV_TIMEOUT_S = "FOUNDRY_AGENTIC_CLI_TIMEOUT_S"
 ENV_DEFAULT_FORMAT = "FOUNDRY_AGENTIC_CLI_DEFAULT_FORMAT"
@@ -30,12 +30,18 @@ ENV_METADATA_ONLY = "FOUNDRY_AGENTIC_CLI_METADATA_ONLY"
 ENV_ENABLE_ATTRIBUTION = "FOUNDRY_AGENTIC_CLI_ENABLE_ATTRIBUTION"
 ENV_ATTRIBUTION_RIDS = "FOUNDRY_AGENTIC_CLI_ATTRIBUTION_RIDS"
 ENV_ENABLE_TRACING = "FOUNDRY_AGENTIC_CLI_ENABLE_TRACING"
+ENV_MAX_DOWNLOAD_BYTES = "FOUNDRY_AGENTIC_CLI_MAX_DOWNLOAD_BYTES"
+ENV_DOWNLOAD_PATH = "FOUNDRY_AGENTIC_CLI_DOWNLOAD_PATH"
+ENV_SESSION_PATH = "FOUNDRY_AGENTIC_CLI_SESSION_PATH"
 
 # Defaults
 DEFAULT_TIMEOUT_S = 30
 DEFAULT_MIN_TIMEOUT_S = 1
 DEFAULT_MAX_TIMEOUT_S = 3600
 DEFAULT_FORMAT = "auto"
+DEFAULT_MAX_DOWNLOAD_BYTES = 1_572_864
+DEFAULT_DOWNLOAD_PATH = Path(".foundry-data/downloads")
+DEFAULT_SESSION_PATH = Path(".foundry-data/sessions")
 
 # Exit code per ADR-001
 EXIT_CONFIGURATION = 9
@@ -314,6 +320,44 @@ class ConfigLoader:
     def enable_tracing(self) -> bool:
         """Tracing enabled flag."""
         return os.environ.get(ENV_ENABLE_TRACING, "").lower() in _TRUTHY
+
+    @property
+    def max_download_bytes(self) -> int:
+        """Maximum persisted binary response size in bytes."""
+        raw = os.environ.get(ENV_MAX_DOWNLOAD_BYTES)
+        if raw is None:
+            return DEFAULT_MAX_DOWNLOAD_BYTES
+        try:
+            value = int(raw.strip())
+        except ValueError as exc:
+            raise ConfigurationError(
+                f"{ENV_MAX_DOWNLOAD_BYTES} must be a positive integer"
+            ) from exc
+        if value <= 0:
+            raise ConfigurationError(
+                f"{ENV_MAX_DOWNLOAD_BYTES} must be a positive integer"
+            )
+        return value
+
+    @property
+    def download_path(self) -> Path:
+        """Validated base path for binary downloads."""
+        return self._configured_path(ENV_DOWNLOAD_PATH, DEFAULT_DOWNLOAD_PATH)
+
+    @property
+    def session_path(self) -> Path:
+        """Validated base path for persisted sessions."""
+        return self._configured_path(ENV_SESSION_PATH, DEFAULT_SESSION_PATH)
+
+    @staticmethod
+    def _configured_path(name: str, default: Path) -> Path:
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        value = raw.strip()
+        if not value or "\x00" in value:
+            raise ConfigurationError(f"{name} must be a non-empty filesystem path")
+        return Path(value)
 
     @property
     def loaded_file(self) -> Optional[str]:
