@@ -495,5 +495,10 @@ async def main() -> int:
         return EXIT_SERVER_ERROR
 
 
+def console_main() -> int:
+    """Run the async CLI from the console script entry point."""
+    return asyncio.run(main())
+
+
 if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))
+    sys.exit(console_main())

@@ -11,6 +11,15 @@ def test_packaged_module_exposes_operation_catalog():
     assert foundry_ontologies_cli.OPERATION_BY_RESOURCE["ontology"]["get"]["method"] == "get"
 
 
+def test_console_main_runs_async_main(monkeypatch):
+    async def fake_main():
+        return 31
+
+    monkeypatch.setattr(foundry_ontologies_cli, "main", fake_main)
+
+    assert foundry_ontologies_cli.console_main() == 31
+
+
 @pytest.mark.asyncio
 async def test_packaged_main_success(monkeypatch, capsys):
     client = MagicMock()
