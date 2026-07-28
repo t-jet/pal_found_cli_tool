@@ -19,11 +19,10 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, Optional, Set
+from typing import Any
 
 from foundry_cli.common.config_loader import ConfigLoader
 from foundry_cli.common.error_serializer import EXIT_ACCESS_CONTROL
-
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +91,7 @@ class AccessControlError(Exception):
         self,
         message: str,
         step: int = 0,
-        blocked_rule: Optional[Dict[str, Any]] = None,
+        blocked_rule: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
@@ -124,11 +123,11 @@ class AccessControlGuard:
         self,
         cfg: ConfigLoader,
         namespace: str,
-        metadata_allowlist_path: Optional[str] = None,
+        metadata_allowlist_path: str | None = None,
     ) -> None:
         self.cfg = cfg
         self.namespace = namespace.upper()
-        self._metadata_allowlist: Optional[Set[str]] = None
+        self._metadata_allowlist: set[str] | None = None
         self._metadata_allowlist_path = metadata_allowlist_path
 
     def _is_write_operation(self, operation: str) -> bool:
@@ -179,11 +178,11 @@ class AccessControlGuard:
         return f"{self.namespace}_{resource.upper()}_{operation.upper()}"
 
     @staticmethod
-    def _is_true_env(value: Optional[str]) -> bool:
+    def _is_true_env(value: str | None) -> bool:
         return value is not None and value.lower() in ("true", "1", "yes", "on")
 
     @staticmethod
-    def _is_false_env(value: Optional[str]) -> bool:
+    def _is_false_env(value: str | None) -> bool:
         return value is not None and value.lower() in ("false", "0", "no", "off")
 
     def _get_global_readonly(self) -> bool:
@@ -262,7 +261,7 @@ class AccessControlGuard:
             },
         )
 
-    def _load_metadata_allowlist(self) -> Set[str]:
+    def _load_metadata_allowlist(self) -> set[str]:
         """Load metadata allow-list from canonical file.
 
         Returns
@@ -276,7 +275,7 @@ class AccessControlGuard:
         The allow-list file is a Markdown table.  This parser is intentionally
         lightweight and extracts lines containing "PERMITTED" to build the set.
         """
-        allowlist_path: Optional[Path]
+        allowlist_path: Path | None
         if self._metadata_allowlist_path:
             allowlist_path = Path(self._metadata_allowlist_path)
         else:
@@ -288,7 +287,7 @@ class AccessControlGuard:
         if not allowlist_path.exists():
             return set()
 
-        permitted: Set[str] = set()
+        permitted: set[str] = set()
         canonical_row = re.compile(
             r"^\|\s*`(?P<sdk_path>[a-z0-9_]+\.[a-z0-9_]+\.[a-z0-9_]+)`\s*"
             r"\|\s*PERMITTED\s*\|",

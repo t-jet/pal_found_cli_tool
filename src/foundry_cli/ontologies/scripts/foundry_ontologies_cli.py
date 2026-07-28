@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# ruff: noqa: E402
 """Foundry Ontologies CLI - 67 canonical API v2 operations."""
 
 from __future__ import annotations
@@ -12,10 +11,10 @@ import logging
 import sys
 from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT: Optional[str] = None
+_PROJECT_ROOT: str | None = None
 _candidate = _SCRIPT_DIR
 for _depth in range(8):
     if (_candidate / "src" / "foundry_cli" / "__init__.py").exists():
@@ -29,7 +28,10 @@ if _PROJECT_ROOT is None:
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from foundry_cli.common.access_control_guard import AccessControlError, AccessControlGuard
+from foundry_cli.common.access_control_guard import (
+    AccessControlError,
+    AccessControlGuard,
+)
 from foundry_cli.common.async_client_factory import AsyncClientFactory
 from foundry_cli.common.binary_download_handler import BinaryDownloadHandler
 from foundry_cli.common.config_loader import ConfigLoader
@@ -81,73 +83,759 @@ def _op(
 
 
 OP_SPECS: tuple[OperationSpec, ...] = (
-    _op("action", "apply", "Action", "apply", ("ontology", "action"), ("parameters", "branch", "options", "sdk_package_rid", "sdk_version", "transaction_id"), json_args=("parameters", "options")),
-    _op("action", "apply_batch", "Action", "apply_batch", ("ontology", "action"), ("requests", "branch", "options", "sdk_package_rid", "sdk_version"), json_args=("requests", "options")),
-    _op("action", "apply_with_overrides", "Action", "apply_with_overrides", ("ontology", "action"), ("overrides", "request", "branch", "sdk_package_rid", "sdk_version", "transaction_id"), json_args=("overrides", "request")),
-    _op("action_type", "get", "Ontology.ActionType", "get", ("ontology", "action_type"), ("branch",)),
-    _op("action_type", "get_by_rid", "Ontology.ActionType", "get_by_rid", ("ontology", "action_type_rid"), ("branch",)),
-    _op("action_type", "get_by_rid_batch", "Ontology.ActionType", "get_by_rid_batch", ("ontology",), ("requests", "branch"), json_args=("requests",)),
-    _op("action_type", "list", "Ontology.ActionType", "list", ("ontology",), ("branch", "page_size", "page_token")),
-    _op("action_type_full_metadata", "get", "ActionTypeFullMetadata", "get", ("ontology", "action_type"), ("branch",)),
-    _op("action_type_full_metadata", "list", "ActionTypeFullMetadata", "list", ("ontology",), ("branch", "object_type_api_names", "page_size", "page_token"), json_args=("object_type_api_names",)),
+    _op(
+        "action",
+        "apply",
+        "Action",
+        "apply",
+        ("ontology", "action"),
+        (
+            "parameters",
+            "branch",
+            "options",
+            "sdk_package_rid",
+            "sdk_version",
+            "transaction_id",
+        ),
+        json_args=("parameters", "options"),
+    ),
+    _op(
+        "action",
+        "apply_batch",
+        "Action",
+        "apply_batch",
+        ("ontology", "action"),
+        ("requests", "branch", "options", "sdk_package_rid", "sdk_version"),
+        json_args=("requests", "options"),
+    ),
+    _op(
+        "action",
+        "apply_with_overrides",
+        "Action",
+        "apply_with_overrides",
+        ("ontology", "action"),
+        (
+            "overrides",
+            "request",
+            "branch",
+            "sdk_package_rid",
+            "sdk_version",
+            "transaction_id",
+        ),
+        json_args=("overrides", "request"),
+    ),
+    _op(
+        "action_type",
+        "get",
+        "Ontology.ActionType",
+        "get",
+        ("ontology", "action_type"),
+        ("branch",),
+    ),
+    _op(
+        "action_type",
+        "get_by_rid",
+        "Ontology.ActionType",
+        "get_by_rid",
+        ("ontology", "action_type_rid"),
+        ("branch",),
+    ),
+    _op(
+        "action_type",
+        "get_by_rid_batch",
+        "Ontology.ActionType",
+        "get_by_rid_batch",
+        ("ontology",),
+        ("requests", "branch"),
+        json_args=("requests",),
+    ),
+    _op(
+        "action_type",
+        "list",
+        "Ontology.ActionType",
+        "list",
+        ("ontology",),
+        ("branch", "page_size", "page_token"),
+    ),
+    _op(
+        "action_type_full_metadata",
+        "get",
+        "ActionTypeFullMetadata",
+        "get",
+        ("ontology", "action_type"),
+        ("branch",),
+    ),
+    _op(
+        "action_type_full_metadata",
+        "list",
+        "ActionTypeFullMetadata",
+        "list",
+        ("ontology",),
+        ("branch", "object_type_api_names", "page_size", "page_token"),
+        json_args=("object_type_api_names",),
+    ),
     _op("attachment", "get", "Attachment", "get", ("attachment_rid",)),
-    _op("attachment", "read", "Attachment", "read", ("attachment_rid",), binary_download=True),
-    _op("attachment", "upload", "Attachment", "upload", (), ("content_length", "content_type", "filename"), binary_upload=True),
-    _op("attachment", "upload_with_rid", "Attachment", "upload_with_rid", ("attachment_rid",), ("content_length", "content_type", "filename", "preview"), binary_upload=True),
-    _op("attachment_property", "get_attachment", "AttachmentProperty", "get_attachment", ("ontology", "object_type", "primary_key", "property"), ("sdk_package_rid", "sdk_version")),
-    _op("attachment_property", "get_attachment_by_rid", "AttachmentProperty", "get_attachment_by_rid", ("ontology", "object_type", "primary_key", "property", "attachment_rid"), ("sdk_package_rid", "sdk_version")),
-    _op("attachment_property", "read_attachment", "AttachmentProperty", "read_attachment", ("ontology", "object_type", "primary_key", "property"), ("sdk_package_rid", "sdk_version"), binary_download=True),
-    _op("attachment_property", "read_attachment_by_rid", "AttachmentProperty", "read_attachment_by_rid", ("ontology", "object_type", "primary_key", "property", "attachment_rid"), ("sdk_package_rid", "sdk_version"), binary_download=True),
-    _op("cipher_text_property", "decrypt", "CipherTextProperty", "decrypt", ("ontology", "object_type", "primary_key", "property")),
-    _op("geotemporal_series_property", "get_geotemporal_series_latest_value", "GeotemporalSeriesProperty", "get_geotemporal_series_latest_value", ("ontology", "object_type", "primary_key", "property_name"), ("sdk_package_rid", "sdk_version")),
-    _op("geotemporal_series_property", "stream_geotemporal_series_historic_values", "GeotemporalSeriesProperty", "stream_geotemporal_series_historic_values", ("ontology", "object_type", "primary_key", "property_name"), ("range", "sdk_package_rid", "sdk_version"), json_args=("range",), binary_download=True),
-    _op("linked_object", "get_linked_object", "LinkedObject", "get_linked_object", ("ontology", "object_type", "primary_key", "link_type", "linked_object_primary_key"), ("branch", "exclude_rid", "sdk_package_rid", "sdk_version", "select"), json_args=("select",)),
-    _op("linked_object", "list_linked_objects", "LinkedObject", "list_linked_objects", ("ontology", "object_type", "primary_key", "link_type"), ("branch", "exclude_rid", "order_by", "page_size", "page_token", "sdk_package_rid", "sdk_version", "select", "snapshot"), json_args=("order_by", "select")),
-    _op("media_reference_property", "get_media_content", "MediaReferenceProperty", "get_media_content", ("ontology", "object_type", "primary_key", "property"), ("preview", "sdk_package_rid", "sdk_version"), binary_download=True),
-    _op("media_reference_property", "get_media_metadata", "MediaReferenceProperty", "get_media_metadata", ("ontology", "object_type", "primary_key", "property"), ("preview", "sdk_package_rid", "sdk_version")),
-    _op("media_reference_property", "upload", "MediaReferenceProperty", "upload", ("ontology", "object_type", "property"), ("media_item_path", "preview"), binary_upload=True),
-    _op("object_type", "get", "Ontology.ObjectType", "get", ("ontology", "object_type"), ("branch",)),
-    _op("object_type", "get_by_rid_batch", "Ontology.ObjectType", "get_by_rid_batch", ("ontology",), ("requests", "branch"), json_args=("requests",)),
-    _op("object_type", "get_edits_history", "Ontology.ObjectType", "get_edits_history", ("ontology", "object_type"), ("branch", "filters", "include_all_previous_properties", "object_primary_key", "page_size", "page_token", "sort_order"), json_args=("filters",)),
-    _op("object_type", "get_full_metadata", "Ontology.ObjectType", "get_full_metadata", ("ontology", "object_type"), ("branch", "preview", "sdk_package_rid", "sdk_version")),
-    _op("object_type", "get_outgoing_link_type", "Ontology.ObjectType", "get_outgoing_link_type", ("ontology", "object_type", "link_type"), ("branch",)),
-    _op("object_type", "list", "Ontology.ObjectType", "list", ("ontology",), ("branch", "page_size", "page_token")),
-    _op("object_type", "list_outgoing_link_types", "Ontology.ObjectType", "list_outgoing_link_types", ("ontology", "object_type"), ("branch", "page_size", "page_token")),
+    _op(
+        "attachment",
+        "read",
+        "Attachment",
+        "read",
+        ("attachment_rid",),
+        binary_download=True,
+    ),
+    _op(
+        "attachment",
+        "upload",
+        "Attachment",
+        "upload",
+        (),
+        ("content_length", "content_type", "filename"),
+        binary_upload=True,
+    ),
+    _op(
+        "attachment",
+        "upload_with_rid",
+        "Attachment",
+        "upload_with_rid",
+        ("attachment_rid",),
+        ("content_length", "content_type", "filename", "preview"),
+        binary_upload=True,
+    ),
+    _op(
+        "attachment_property",
+        "get_attachment",
+        "AttachmentProperty",
+        "get_attachment",
+        ("ontology", "object_type", "primary_key", "property"),
+        ("sdk_package_rid", "sdk_version"),
+    ),
+    _op(
+        "attachment_property",
+        "get_attachment_by_rid",
+        "AttachmentProperty",
+        "get_attachment_by_rid",
+        ("ontology", "object_type", "primary_key", "property", "attachment_rid"),
+        ("sdk_package_rid", "sdk_version"),
+    ),
+    _op(
+        "attachment_property",
+        "read_attachment",
+        "AttachmentProperty",
+        "read_attachment",
+        ("ontology", "object_type", "primary_key", "property"),
+        ("sdk_package_rid", "sdk_version"),
+        binary_download=True,
+    ),
+    _op(
+        "attachment_property",
+        "read_attachment_by_rid",
+        "AttachmentProperty",
+        "read_attachment_by_rid",
+        ("ontology", "object_type", "primary_key", "property", "attachment_rid"),
+        ("sdk_package_rid", "sdk_version"),
+        binary_download=True,
+    ),
+    _op(
+        "cipher_text_property",
+        "decrypt",
+        "CipherTextProperty",
+        "decrypt",
+        ("ontology", "object_type", "primary_key", "property"),
+    ),
+    _op(
+        "geotemporal_series_property",
+        "get_geotemporal_series_latest_value",
+        "GeotemporalSeriesProperty",
+        "get_geotemporal_series_latest_value",
+        ("ontology", "object_type", "primary_key", "property_name"),
+        ("sdk_package_rid", "sdk_version"),
+    ),
+    _op(
+        "geotemporal_series_property",
+        "stream_geotemporal_series_historic_values",
+        "GeotemporalSeriesProperty",
+        "stream_geotemporal_series_historic_values",
+        ("ontology", "object_type", "primary_key", "property_name"),
+        ("range", "sdk_package_rid", "sdk_version"),
+        json_args=("range",),
+        binary_download=True,
+    ),
+    _op(
+        "linked_object",
+        "get_linked_object",
+        "LinkedObject",
+        "get_linked_object",
+        (
+            "ontology",
+            "object_type",
+            "primary_key",
+            "link_type",
+            "linked_object_primary_key",
+        ),
+        ("branch", "exclude_rid", "sdk_package_rid", "sdk_version", "select"),
+        json_args=("select",),
+    ),
+    _op(
+        "linked_object",
+        "list_linked_objects",
+        "LinkedObject",
+        "list_linked_objects",
+        ("ontology", "object_type", "primary_key", "link_type"),
+        (
+            "branch",
+            "exclude_rid",
+            "order_by",
+            "page_size",
+            "page_token",
+            "sdk_package_rid",
+            "sdk_version",
+            "select",
+            "snapshot",
+        ),
+        json_args=("order_by", "select"),
+    ),
+    _op(
+        "media_reference_property",
+        "get_media_content",
+        "MediaReferenceProperty",
+        "get_media_content",
+        ("ontology", "object_type", "primary_key", "property"),
+        ("preview", "sdk_package_rid", "sdk_version"),
+        binary_download=True,
+    ),
+    _op(
+        "media_reference_property",
+        "get_media_metadata",
+        "MediaReferenceProperty",
+        "get_media_metadata",
+        ("ontology", "object_type", "primary_key", "property"),
+        ("preview", "sdk_package_rid", "sdk_version"),
+    ),
+    _op(
+        "media_reference_property",
+        "upload",
+        "MediaReferenceProperty",
+        "upload",
+        ("ontology", "object_type", "property"),
+        ("media_item_path", "preview"),
+        binary_upload=True,
+    ),
+    _op(
+        "object_type",
+        "get",
+        "Ontology.ObjectType",
+        "get",
+        ("ontology", "object_type"),
+        ("branch",),
+    ),
+    _op(
+        "object_type",
+        "get_by_rid_batch",
+        "Ontology.ObjectType",
+        "get_by_rid_batch",
+        ("ontology",),
+        ("requests", "branch"),
+        json_args=("requests",),
+    ),
+    _op(
+        "object_type",
+        "get_edits_history",
+        "Ontology.ObjectType",
+        "get_edits_history",
+        ("ontology", "object_type"),
+        (
+            "branch",
+            "filters",
+            "include_all_previous_properties",
+            "object_primary_key",
+            "page_size",
+            "page_token",
+            "sort_order",
+        ),
+        json_args=("filters",),
+    ),
+    _op(
+        "object_type",
+        "get_full_metadata",
+        "Ontology.ObjectType",
+        "get_full_metadata",
+        ("ontology", "object_type"),
+        ("branch", "preview", "sdk_package_rid", "sdk_version"),
+    ),
+    _op(
+        "object_type",
+        "get_outgoing_link_type",
+        "Ontology.ObjectType",
+        "get_outgoing_link_type",
+        ("ontology", "object_type", "link_type"),
+        ("branch",),
+    ),
+    _op(
+        "object_type",
+        "list",
+        "Ontology.ObjectType",
+        "list",
+        ("ontology",),
+        ("branch", "page_size", "page_token"),
+    ),
+    _op(
+        "object_type",
+        "list_outgoing_link_types",
+        "Ontology.ObjectType",
+        "list_outgoing_link_types",
+        ("ontology", "object_type"),
+        ("branch", "page_size", "page_token"),
+    ),
     _op("ontology", "get", "Ontology", "get", ("ontology",)),
-    _op("ontology", "get_full_metadata", "Ontology", "get_full_metadata", ("ontology",), ("branch",)),
+    _op(
+        "ontology",
+        "get_full_metadata",
+        "Ontology",
+        "get_full_metadata",
+        ("ontology",),
+        ("branch",),
+    ),
     _op("ontology", "list", "Ontology", "list"),
-    _op("ontology", "load_metadata", "Ontology", "load_metadata", ("ontology",), ("action_types", "interface_types", "link_types", "object_types", "query_types", "branch", "preview"), json_args=("action_types", "interface_types", "link_types", "object_types", "query_types")),
-    _op("ontology_interface", "aggregate", "OntologyInterface", "aggregate", ("ontology", "interface_type"), ("aggregation", "group_by", "accuracy", "branch", "preview", "where"), json_args=("aggregation", "group_by", "where")),
-    _op("ontology_interface", "get", "OntologyInterface", "get", ("ontology", "interface_type"), ("branch", "preview", "sdk_package_rid", "sdk_version")),
-    _op("ontology_interface", "get_outgoing_interface_link_type", "OntologyInterface", "get_outgoing_interface_link_type", ("ontology", "interface_type", "interface_link_type"), ("branch",)),
-    _op("ontology_interface", "list", "OntologyInterface", "list", ("ontology",), ("branch", "page_size", "page_token", "preview")),
-    _op("ontology_interface", "list_interface_linked_objects", "OntologyInterface", "list_interface_linked_objects", ("ontology", "interface_type", "object_type", "primary_key", "interface_link_type"), ("branch", "exclude_rid", "order_by", "page_size", "page_token", "preview", "select", "snapshot"), json_args=("order_by", "select")),
-    _op("ontology_interface", "list_objects_for_interface", "OntologyInterface", "list_objects_for_interface", ("ontology", "interface_type"), ("branch", "exclude_rid", "order_by", "page_size", "page_token", "preview", "select", "snapshot"), json_args=("order_by", "select")),
-    _op("ontology_interface", "list_outgoing_interface_link_types", "OntologyInterface", "list_outgoing_interface_link_types", ("ontology", "interface_type"), ("branch",)),
-    _op("ontology_interface", "search", "OntologyInterface", "search", ("ontology", "interface_type"), ("augmented_interface_property_types", "augmented_properties", "augmented_shared_property_types", "other_interface_types", "selected_interface_property_types", "selected_object_types", "selected_shared_property_types", "branch", "order_by", "page_size", "page_token", "preview", "where"), json_args=("augmented_interface_property_types", "augmented_properties", "augmented_shared_property_types", "other_interface_types", "selected_interface_property_types", "selected_object_types", "selected_shared_property_types", "order_by", "where")),
-    _op("ontology_object", "aggregate", "OntologyObject", "aggregate", ("ontology", "object_type"), ("aggregation", "group_by", "accuracy", "branch", "sdk_package_rid", "sdk_version", "where"), json_args=("aggregation", "group_by", "where")),
-    _op("ontology_object", "count", "OntologyObject", "count", ("ontology", "object_type"), ("branch", "sdk_package_rid", "sdk_version")),
-    _op("ontology_object", "get", "OntologyObject", "get", ("ontology", "object_type", "primary_key"), ("branch", "exclude_rid", "sdk_package_rid", "sdk_version", "select"), json_args=("select",)),
-    _op("ontology_object", "list", "OntologyObject", "list", ("ontology", "object_type"), ("branch", "exclude_rid", "order_by", "page_size", "page_token", "sdk_package_rid", "sdk_version", "select", "snapshot"), json_args=("order_by", "select")),
-    _op("ontology_object", "search", "OntologyObject", "search", ("ontology", "object_type"), ("select", "branch", "exclude_rid", "order_by", "page_size", "page_token", "sdk_package_rid", "sdk_version", "select_v2", "snapshot", "where"), json_args=("select", "order_by", "select_v2", "where")),
-    _op("ontology_object_set", "aggregate", "OntologyObjectSet", "aggregate", ("ontology",), ("aggregation", "group_by", "object_set", "accuracy", "branch", "include_compute_usage", "sdk_package_rid", "sdk_version", "transaction_id"), json_args=("aggregation", "group_by", "object_set")),
-    _op("ontology_object_set", "create_temporary", "OntologyObjectSet", "create_temporary", ("ontology",), ("object_set", "branch", "sdk_package_rid", "sdk_version"), json_args=("object_set",)),
-    _op("ontology_object_set", "get", "OntologyObjectSet", "get", ("ontology", "object_set_rid")),
-    _op("ontology_object_set", "load", "OntologyObjectSet", "load", ("ontology",), ("object_set", "select", "branch", "exclude_rid", "include_compute_usage", "load_property_securities", "order_by", "page_size", "page_token", "sdk_package_rid", "sdk_version", "select_v2", "snapshot", "transaction_id"), json_args=("object_set", "select", "order_by", "select_v2")),
-    _op("ontology_object_set", "load_links", "OntologyObjectSet", "load_links", ("ontology",), ("links", "object_set", "branch", "include_compute_usage", "page_token", "preview", "sdk_package_rid", "sdk_version"), json_args=("links", "object_set")),
-    _op("ontology_object_set", "load_multiple_object_types", "OntologyObjectSet", "load_multiple_object_types", ("ontology",), ("object_set", "select", "branch", "exclude_rid", "include_compute_usage", "load_property_securities", "order_by", "page_size", "page_token", "preview", "sdk_package_rid", "sdk_version", "select_v2", "snapshot", "transaction_id"), json_args=("object_set", "select", "order_by", "select_v2")),
-    _op("ontology_object_set", "load_objects_or_interfaces", "OntologyObjectSet", "load_objects_or_interfaces", ("ontology",), ("object_set", "select", "branch", "exclude_rid", "order_by", "page_size", "page_token", "preview", "sdk_package_rid", "sdk_version", "select_v2", "snapshot", "transaction_id"), json_args=("object_set", "select", "order_by", "select_v2")),
-    _op("ontology_transaction", "post_edits", "OntologyTransaction", "post_edits", ("ontology", "transaction_id"), ("edits", "preview", "sdk_package_rid", "sdk_version"), json_args=("edits",)),
-    _op("ontology_value_type", "get", "OntologyValueType", "get", ("ontology", "value_type"), ("preview",)),
-    _op("ontology_value_type", "list", "OntologyValueType", "list", ("ontology",), ("preview",)),
-    _op("query", "execute", "Query", "execute", ("ontology", "query_api_name"), ("parameters", "attribution", "branch", "sdk_package_rid", "sdk_version", "transaction_id", "version"), json_args=("parameters", "attribution")),
-    _op("query_type", "get", "Ontology.QueryType", "get", ("ontology", "query_api_name"), ("sdk_package_rid", "sdk_version", "version")),
-    _op("query_type", "list", "Ontology.QueryType", "list", ("ontology",), ("page_size", "page_token")),
-    _op("time_series_property_v2", "get_first_point", "TimeSeriesPropertyV2", "get_first_point", ("ontology", "object_type", "primary_key", "property"), ("sdk_package_rid", "sdk_version")),
-    _op("time_series_property_v2", "get_last_point", "TimeSeriesPropertyV2", "get_last_point", ("ontology", "object_type", "primary_key", "property"), ("sdk_package_rid", "sdk_version")),
-    _op("time_series_property_v2", "stream_points", "TimeSeriesPropertyV2", "stream_points", ("ontology", "object_type", "primary_key", "property"), ("aggregate", "format", "range", "sdk_package_rid", "sdk_version"), json_args=("aggregate", "range"), binary_download=True),
-    _op("time_series_value_bank_property", "get_latest_value", "TimeSeriesValueBankProperty", "get_latest_value", ("ontology", "object_type", "primary_key", "property_name"), ("sdk_package_rid", "sdk_version")),
-    _op("time_series_value_bank_property", "stream_values", "TimeSeriesValueBankProperty", "stream_values", ("ontology", "object_type", "primary_key", "property"), ("range", "sdk_package_rid", "sdk_version"), json_args=("range",), binary_download=True),
+    _op(
+        "ontology",
+        "load_metadata",
+        "Ontology",
+        "load_metadata",
+        ("ontology",),
+        (
+            "action_types",
+            "interface_types",
+            "link_types",
+            "object_types",
+            "query_types",
+            "branch",
+            "preview",
+        ),
+        json_args=(
+            "action_types",
+            "interface_types",
+            "link_types",
+            "object_types",
+            "query_types",
+        ),
+    ),
+    _op(
+        "ontology_interface",
+        "aggregate",
+        "OntologyInterface",
+        "aggregate",
+        ("ontology", "interface_type"),
+        ("aggregation", "group_by", "accuracy", "branch", "preview", "where"),
+        json_args=("aggregation", "group_by", "where"),
+    ),
+    _op(
+        "ontology_interface",
+        "get",
+        "OntologyInterface",
+        "get",
+        ("ontology", "interface_type"),
+        ("branch", "preview", "sdk_package_rid", "sdk_version"),
+    ),
+    _op(
+        "ontology_interface",
+        "get_outgoing_interface_link_type",
+        "OntologyInterface",
+        "get_outgoing_interface_link_type",
+        ("ontology", "interface_type", "interface_link_type"),
+        ("branch",),
+    ),
+    _op(
+        "ontology_interface",
+        "list",
+        "OntologyInterface",
+        "list",
+        ("ontology",),
+        ("branch", "page_size", "page_token", "preview"),
+    ),
+    _op(
+        "ontology_interface",
+        "list_interface_linked_objects",
+        "OntologyInterface",
+        "list_interface_linked_objects",
+        (
+            "ontology",
+            "interface_type",
+            "object_type",
+            "primary_key",
+            "interface_link_type",
+        ),
+        (
+            "branch",
+            "exclude_rid",
+            "order_by",
+            "page_size",
+            "page_token",
+            "preview",
+            "select",
+            "snapshot",
+        ),
+        json_args=("order_by", "select"),
+    ),
+    _op(
+        "ontology_interface",
+        "list_objects_for_interface",
+        "OntologyInterface",
+        "list_objects_for_interface",
+        ("ontology", "interface_type"),
+        (
+            "branch",
+            "exclude_rid",
+            "order_by",
+            "page_size",
+            "page_token",
+            "preview",
+            "select",
+            "snapshot",
+        ),
+        json_args=("order_by", "select"),
+    ),
+    _op(
+        "ontology_interface",
+        "list_outgoing_interface_link_types",
+        "OntologyInterface",
+        "list_outgoing_interface_link_types",
+        ("ontology", "interface_type"),
+        ("branch",),
+    ),
+    _op(
+        "ontology_interface",
+        "search",
+        "OntologyInterface",
+        "search",
+        ("ontology", "interface_type"),
+        (
+            "augmented_interface_property_types",
+            "augmented_properties",
+            "augmented_shared_property_types",
+            "other_interface_types",
+            "selected_interface_property_types",
+            "selected_object_types",
+            "selected_shared_property_types",
+            "branch",
+            "order_by",
+            "page_size",
+            "page_token",
+            "preview",
+            "where",
+        ),
+        json_args=(
+            "augmented_interface_property_types",
+            "augmented_properties",
+            "augmented_shared_property_types",
+            "other_interface_types",
+            "selected_interface_property_types",
+            "selected_object_types",
+            "selected_shared_property_types",
+            "order_by",
+            "where",
+        ),
+    ),
+    _op(
+        "ontology_object",
+        "aggregate",
+        "OntologyObject",
+        "aggregate",
+        ("ontology", "object_type"),
+        (
+            "aggregation",
+            "group_by",
+            "accuracy",
+            "branch",
+            "sdk_package_rid",
+            "sdk_version",
+            "where",
+        ),
+        json_args=("aggregation", "group_by", "where"),
+    ),
+    _op(
+        "ontology_object",
+        "count",
+        "OntologyObject",
+        "count",
+        ("ontology", "object_type"),
+        ("branch", "sdk_package_rid", "sdk_version"),
+    ),
+    _op(
+        "ontology_object",
+        "get",
+        "OntologyObject",
+        "get",
+        ("ontology", "object_type", "primary_key"),
+        ("branch", "exclude_rid", "sdk_package_rid", "sdk_version", "select"),
+        json_args=("select",),
+    ),
+    _op(
+        "ontology_object",
+        "list",
+        "OntologyObject",
+        "list",
+        ("ontology", "object_type"),
+        (
+            "branch",
+            "exclude_rid",
+            "order_by",
+            "page_size",
+            "page_token",
+            "sdk_package_rid",
+            "sdk_version",
+            "select",
+            "snapshot",
+        ),
+        json_args=("order_by", "select"),
+    ),
+    _op(
+        "ontology_object",
+        "search",
+        "OntologyObject",
+        "search",
+        ("ontology", "object_type"),
+        (
+            "select",
+            "branch",
+            "exclude_rid",
+            "order_by",
+            "page_size",
+            "page_token",
+            "sdk_package_rid",
+            "sdk_version",
+            "select_v2",
+            "snapshot",
+            "where",
+        ),
+        json_args=("select", "order_by", "select_v2", "where"),
+    ),
+    _op(
+        "ontology_object_set",
+        "aggregate",
+        "OntologyObjectSet",
+        "aggregate",
+        ("ontology",),
+        (
+            "aggregation",
+            "group_by",
+            "object_set",
+            "accuracy",
+            "branch",
+            "include_compute_usage",
+            "sdk_package_rid",
+            "sdk_version",
+            "transaction_id",
+        ),
+        json_args=("aggregation", "group_by", "object_set"),
+    ),
+    _op(
+        "ontology_object_set",
+        "create_temporary",
+        "OntologyObjectSet",
+        "create_temporary",
+        ("ontology",),
+        ("object_set", "branch", "sdk_package_rid", "sdk_version"),
+        json_args=("object_set",),
+    ),
+    _op(
+        "ontology_object_set",
+        "get",
+        "OntologyObjectSet",
+        "get",
+        ("ontology", "object_set_rid"),
+    ),
+    _op(
+        "ontology_object_set",
+        "load",
+        "OntologyObjectSet",
+        "load",
+        ("ontology",),
+        (
+            "object_set",
+            "select",
+            "branch",
+            "exclude_rid",
+            "include_compute_usage",
+            "load_property_securities",
+            "order_by",
+            "page_size",
+            "page_token",
+            "sdk_package_rid",
+            "sdk_version",
+            "select_v2",
+            "snapshot",
+            "transaction_id",
+        ),
+        json_args=("object_set", "select", "order_by", "select_v2"),
+    ),
+    _op(
+        "ontology_object_set",
+        "load_links",
+        "OntologyObjectSet",
+        "load_links",
+        ("ontology",),
+        (
+            "links",
+            "object_set",
+            "branch",
+            "include_compute_usage",
+            "page_token",
+            "preview",
+            "sdk_package_rid",
+            "sdk_version",
+        ),
+        json_args=("links", "object_set"),
+    ),
+    _op(
+        "ontology_object_set",
+        "load_multiple_object_types",
+        "OntologyObjectSet",
+        "load_multiple_object_types",
+        ("ontology",),
+        (
+            "object_set",
+            "select",
+            "branch",
+            "exclude_rid",
+            "include_compute_usage",
+            "load_property_securities",
+            "order_by",
+            "page_size",
+            "page_token",
+            "preview",
+            "sdk_package_rid",
+            "sdk_version",
+            "select_v2",
+            "snapshot",
+            "transaction_id",
+        ),
+        json_args=("object_set", "select", "order_by", "select_v2"),
+    ),
+    _op(
+        "ontology_object_set",
+        "load_objects_or_interfaces",
+        "OntologyObjectSet",
+        "load_objects_or_interfaces",
+        ("ontology",),
+        (
+            "object_set",
+            "select",
+            "branch",
+            "exclude_rid",
+            "order_by",
+            "page_size",
+            "page_token",
+            "preview",
+            "sdk_package_rid",
+            "sdk_version",
+            "select_v2",
+            "snapshot",
+            "transaction_id",
+        ),
+        json_args=("object_set", "select", "order_by", "select_v2"),
+    ),
+    _op(
+        "ontology_transaction",
+        "post_edits",
+        "OntologyTransaction",
+        "post_edits",
+        ("ontology", "transaction_id"),
+        ("edits", "preview", "sdk_package_rid", "sdk_version"),
+        json_args=("edits",),
+    ),
+    _op(
+        "ontology_value_type",
+        "get",
+        "OntologyValueType",
+        "get",
+        ("ontology", "value_type"),
+        ("preview",),
+    ),
+    _op(
+        "ontology_value_type",
+        "list",
+        "OntologyValueType",
+        "list",
+        ("ontology",),
+        ("preview",),
+    ),
+    _op(
+        "query",
+        "execute",
+        "Query",
+        "execute",
+        ("ontology", "query_api_name"),
+        (
+            "parameters",
+            "attribution",
+            "branch",
+            "sdk_package_rid",
+            "sdk_version",
+            "transaction_id",
+            "version",
+        ),
+        json_args=("parameters", "attribution"),
+    ),
+    _op(
+        "query_type",
+        "get",
+        "Ontology.QueryType",
+        "get",
+        ("ontology", "query_api_name"),
+        ("sdk_package_rid", "sdk_version", "version"),
+    ),
+    _op(
+        "query_type",
+        "list",
+        "Ontology.QueryType",
+        "list",
+        ("ontology",),
+        ("page_size", "page_token"),
+    ),
+    _op(
+        "time_series_property_v2",
+        "get_first_point",
+        "TimeSeriesPropertyV2",
+        "get_first_point",
+        ("ontology", "object_type", "primary_key", "property"),
+        ("sdk_package_rid", "sdk_version"),
+    ),
+    _op(
+        "time_series_property_v2",
+        "get_last_point",
+        "TimeSeriesPropertyV2",
+        "get_last_point",
+        ("ontology", "object_type", "primary_key", "property"),
+        ("sdk_package_rid", "sdk_version"),
+    ),
+    _op(
+        "time_series_property_v2",
+        "stream_points",
+        "TimeSeriesPropertyV2",
+        "stream_points",
+        ("ontology", "object_type", "primary_key", "property"),
+        ("aggregate", "format", "range", "sdk_package_rid", "sdk_version"),
+        json_args=("aggregate", "range"),
+        binary_download=True,
+    ),
+    _op(
+        "time_series_value_bank_property",
+        "get_latest_value",
+        "TimeSeriesValueBankProperty",
+        "get_latest_value",
+        ("ontology", "object_type", "primary_key", "property_name"),
+        ("sdk_package_rid", "sdk_version"),
+    ),
+    _op(
+        "time_series_value_bank_property",
+        "stream_values",
+        "TimeSeriesValueBankProperty",
+        "stream_values",
+        ("ontology", "object_type", "primary_key", "property"),
+        ("range", "sdk_package_rid", "sdk_version"),
+        json_args=("range",),
+        binary_download=True,
+    ),
 )
 
 OPERATION_BY_RESOURCE: dict[str, dict[str, OperationSpec]] = {}
@@ -205,7 +893,9 @@ def _common_parser() -> argparse.ArgumentParser:
     common.add_argument("--page-token", type=str, default=None, dest="page_token")
     common.add_argument("--batch-pages", type=int, default=None, dest="batch_pages")
     common.add_argument("--output-filename", default=None, dest="output_filename")
-    common.add_argument("--content-length", type=int, default=None, dest="content_length")
+    common.add_argument(
+        "--content-length", type=int, default=None, dest="content_length"
+    )
     common.add_argument("--content-type", default=None, dest="content_type")
     common.add_argument("--body-file", default=None, dest="body_file")
     return common
@@ -227,10 +917,17 @@ def build_parser() -> argparse.ArgumentParser:
             for arg_name in spec["positional"]:
                 op_parser.add_argument(arg_name)
             for arg_name in spec["optional"]:
-                if arg_name in {"page_size", "page_token", "content_length", "content_type"}:
+                if arg_name in {
+                    "page_size",
+                    "page_token",
+                    "content_length",
+                    "content_type",
+                }:
                     continue
                 if arg_name == "format":
-                    op_parser.add_argument("--stream-format", default=None, dest="stream_format")
+                    op_parser.add_argument(
+                        "--stream-format", default=None, dest="stream_format"
+                    )
                     continue
                 flag = "--" + _kebab(arg_name)
                 if arg_name.startswith("include_") or arg_name in {
@@ -240,7 +937,9 @@ def build_parser() -> argparse.ArgumentParser:
                     "load_property_securities",
                     "include_all_previous_properties",
                 }:
-                    op_parser.add_argument(flag, action="store_true", default=None, dest=arg_name)
+                    op_parser.add_argument(
+                        flag, action="store_true", default=None, dest=arg_name
+                    )
                 else:
                     op_parser.add_argument(flag, default=None, dest=arg_name)
 
@@ -254,7 +953,9 @@ def _spec_for(resource: str, operation: str) -> OperationSpec:
         raise ValueError(f"Unknown operation: {resource}.{operation}") from exc
 
 
-def _get_client(cfg: ConfigLoader, resource: str, factory: AsyncClientFactory | None = None) -> Any:
+def _get_client(
+    cfg: ConfigLoader, resource: str, factory: AsyncClientFactory | None = None
+) -> Any:
     """Get SDK client for an ontology resource."""
     root = (factory or AsyncClientFactory()).create(cfg).ontologies
     spec = next(iter(OPERATION_BY_RESOURCE[resource].values()))
@@ -279,7 +980,9 @@ def _read_binary_body(args: argparse.Namespace) -> bytes:
     return Path(body_file).read_bytes()
 
 
-async def _bytes_iter(value: bytes | bytearray | AsyncIterable[bytes]) -> AsyncIterable[bytes]:
+async def _bytes_iter(
+    value: bytes | bytearray | AsyncIterable[bytes],
+) -> AsyncIterable[bytes]:
     if isinstance(value, (bytes, bytearray)):
         yield bytes(value)
         return
@@ -324,7 +1027,7 @@ async def _invoke(
     operation: str,
     client: Any,
     args: argparse.Namespace,
-    timeout: Optional[int],
+    timeout: int | None,
     cfg: ConfigLoader | None = None,
 ) -> Any:
     """Invoke an ontology SDK operation."""
@@ -338,7 +1041,11 @@ async def _invoke(
             continue
         if name == "format":
             value = getattr(args, "stream_format", None)
-            if value is None and getattr(args, "format", None) not in {"json", "toon", "auto"}:
+            if value is None and getattr(args, "format", None) not in {
+                "json",
+                "toon",
+                "auto",
+            }:
                 value = getattr(args, "format", None)
         else:
             value = getattr(args, name, None)
@@ -352,9 +1059,15 @@ async def _invoke(
             positional.insert(body_index, body)
         if spec["resource"] == "attachment":
             if not getattr(args, "filename", None):
-                raise ValueError("filename is required for attachment upload operations")
-            kwargs["content_length"] = getattr(args, "content_length", None) or len(body)
-            kwargs["content_type"] = getattr(args, "content_type", None) or "application/octet-stream"
+                raise ValueError(
+                    "filename is required for attachment upload operations"
+                )
+            kwargs["content_length"] = getattr(args, "content_length", None) or len(
+                body
+            )
+            kwargs["content_type"] = (
+                getattr(args, "content_type", None) or "application/octet-stream"
+            )
 
     kwargs["request_timeout"] = timeout
     result = await _resolve_result(method(*positional, **kwargs))
@@ -389,7 +1102,7 @@ async def _invoke_paginated(
     operation: str,
     client: Any,
     args: argparse.Namespace,
-    timeout: Optional[int],
+    timeout: int | None,
     helper: PaginationHelper,
     cfg: ConfigLoader,
 ) -> Any:
@@ -397,7 +1110,9 @@ async def _invoke_paginated(
 
     async def _single_page(**page_kwargs: Any) -> Any:
         paged_args = argparse.Namespace(**vars(args))
-        paged_args.page_size = page_kwargs.get("page_size", getattr(args, "page_size", None))
+        paged_args.page_size = page_kwargs.get(
+            "page_size", getattr(args, "page_size", None)
+        )
         paged_args.page_token = page_kwargs.get("page_token", None)
         return await _invoke(resource, operation, client, paged_args, timeout, cfg)
 
@@ -421,7 +1136,9 @@ async def main() -> int:
 
     resource = args.resource.replace("-", "_")
     operation = _resolve(resource, args.operation)
-    logger.info("Executing operation", extra={"resource": resource, "operation": operation})
+    logger.info(
+        "Executing operation", extra={"resource": resource, "operation": operation}
+    )
 
     try:
         _spec_for(resource, operation)

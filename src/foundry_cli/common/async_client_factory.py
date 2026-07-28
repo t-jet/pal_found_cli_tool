@@ -11,13 +11,13 @@ avoids shared mutable state, and matches the CLI's per-command lifecycle.
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from foundry_cli.common.config_loader import ConfigLoader, ConfigurationError
 from foundry_cli.common.tracing_provider import B3Context, TracingProvider
 
 if TYPE_CHECKING:
-    from foundry_sdk import AsyncFoundryClient, UserTokenAuth
+    from foundry_sdk import AsyncFoundryClient
 
 
 class AsyncClientFactory:
@@ -32,7 +32,7 @@ class AsyncClientFactory:
     def __init__(self) -> None:
         # Per-instance state only — no class-level caching. Each factory
         # instance is independent; ``create()`` never mutates shared state.
-        self._last_client: Optional["AsyncFoundryClient"] = None
+        self._last_client: AsyncFoundryClient | None = None
 
     def create(self, cfg: ConfigLoader) -> "AsyncFoundryClient":
         """Create an ``AsyncFoundryClient`` from credentials in ``cfg``.
@@ -74,7 +74,7 @@ class AsyncClientFactory:
                 "foundry-sdk not installed; run 'pip install foundry-platform-sdk'"
             ) from exc
 
-        auth: "UserTokenAuth" = UserTokenAuth(token)
+        auth: UserTokenAuth = UserTokenAuth(token)
 
         client_kwargs: dict[str, Any] = {
             "auth": auth,
@@ -84,13 +84,13 @@ class AsyncClientFactory:
 
         # SDK reads attribution from a context variable when sending requests.
         # Always set it here so disabled or empty config clears prior values.
-        rids: List[str] = []
+        rids: list[str] = []
         if cfg.enable_attribution and cfg.attribution_rids:
             rids = [r.strip() for r in cfg.attribution_rids.split(",")]
             rids = [r for r in rids if r]
         ATTRIBUTION_VAR.set(rids or None)
 
-        client: "AsyncFoundryClient" = AsyncFoundryClient(**client_kwargs)
+        client: AsyncFoundryClient = AsyncFoundryClient(**client_kwargs)
         self._last_client = client
         return client
 

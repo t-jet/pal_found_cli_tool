@@ -22,28 +22,28 @@ import asyncio
 import json
 import logging
 import sys
-from typing import Any, Optional, cast
+from typing import Any, cast
 
-from foundry_cli.common.config_loader import ConfigLoader
+from foundry_cli.common.access_control_guard import (
+    AccessControlError,
+    AccessControlGuard,
+)
 from foundry_cli.common.async_client_factory import AsyncClientFactory
+from foundry_cli.common.config_loader import ConfigLoader
 from foundry_cli.common.error_serializer import (
-    EXIT_SUCCESS,
-    EXIT_USER_INPUT,
-    EXIT_PERMISSION_DENIED,
-    EXIT_NOT_FOUND,
-    EXIT_TIMEOUT,
-    EXIT_SERVER_ERROR,
-    EXIT_RATE_LIMIT,
     EXIT_ACCESS_CONTROL,
     EXIT_CONFIGURATION,
+    EXIT_NOT_FOUND,
+    EXIT_PERMISSION_DENIED,
+    EXIT_RATE_LIMIT,
+    EXIT_SERVER_ERROR,
+    EXIT_SUCCESS,
+    EXIT_TIMEOUT,
+    EXIT_USER_INPUT,
     ErrorSerializer,
 )
-from foundry_cli.common.output_formatter import OutputFormatter
 from foundry_cli.common.log_setup import LogSetup
-from foundry_cli.common.access_control_guard import (
-    AccessControlGuard,
-    AccessControlError,
-)
+from foundry_cli.common.output_formatter import OutputFormatter
 from foundry_cli.common.pagination_helper import PaginationHelper
 from foundry_cli.common.retry import RetryHandler
 
@@ -111,7 +111,7 @@ async def _invoke(
     operation: str,
     client: Any,
     args: argparse.Namespace,
-    timeout: Optional[int],
+    timeout: int | None,
 ) -> Any:
     """Invoke SDK operation (async).
 
@@ -371,7 +371,7 @@ async def _invoke_paginated(
     operation: str,
     client: Any,
     args: argparse.Namespace,
-    timeout: Optional[int],
+    timeout: int | None,
     helper: PaginationHelper,
 ) -> Any:
     """Invoke a paginated SDK operation through PaginationHelper.
@@ -658,7 +658,7 @@ async def async_main() -> int:
 
     # Build PaginationHelper when the operation is paginated (FR-PAG).
     # --page-size / --page-token / --batch-pages are parsed by _common_parser.
-    helper: Optional[PaginationHelper] = None
+    helper: PaginationHelper | None = None
     if _is_paginated(resource, operation):
         helper = PaginationHelper(
             page_size=getattr(args, "page_size", None),

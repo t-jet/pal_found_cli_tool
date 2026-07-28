@@ -42,7 +42,12 @@ check_untyped_defs = true
 warn_return_any = true
 warn_unused_configs = true
 
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E501"]
+
 [tool.ruff.lint.per-file-ignores]
+"src/foundry_cli/ontologies/scripts/*.py" = ["E402"]
 "tests/*.py" = ["E402", "E741", "F401", "F841"]
 
 [tool.coverage.run]

@@ -4,7 +4,7 @@ Validates that FOUNDRY_TOKEN and FOUNDRY_HOSTNAME are present
 and constructs a UserTokenAuth instance for the SDK.
 """
 
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING
 
 from foundry_cli.common.config_loader import ConfigurationError
 
@@ -22,7 +22,7 @@ class AuthProvider:
     """
 
     @staticmethod
-    def validate(token: Optional[str], hostname: Optional[str]) -> Tuple[bool, Optional[str]]:
+    def validate(token: str | None, hostname: str | None) -> tuple[bool, str | None]:
         """Validate that credentials are present and non-empty.
 
         Whitespace-only values are rejected — a token consisting solely of

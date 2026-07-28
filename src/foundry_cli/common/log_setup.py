@@ -25,9 +25,8 @@ import logging
 import os
 import sys
 import threading
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
-
+from datetime import UTC, datetime
+from typing import Any
 
 # Metadata separator as defined in ADR-005
 METADATA_SEPARATOR = "# ---metadata-start---"
@@ -63,9 +62,9 @@ class _NdJsonFormatter(logging.Formatter):
         str
             A single JSON line representing the log record.
         """
-        ts = datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat()
+        ts = datetime.fromtimestamp(record.created, tz=UTC).isoformat()
 
-        log_entry: Dict[str, Any] = {
+        log_entry: dict[str, Any] = {
             "ts": ts,
             "level": record.levelname,
             "logger": record.name,
@@ -119,7 +118,7 @@ class LogSetup:
     @classmethod
     def configure(
         cls,
-        log_level: Optional[str] = None,
+        log_level: str | None = None,
     ) -> logging.Logger:
         """Configure the root logger with NDJSON formatter to stderr.
 
@@ -200,7 +199,7 @@ class LogSetup:
         sys.stderr.flush()
 
     @staticmethod
-    def emit_metadata(metadata: Dict[str, Any]) -> None:
+    def emit_metadata(metadata: dict[str, Any]) -> None:
         """Emit metadata JSON to stderr after the separator.
 
         Parameters

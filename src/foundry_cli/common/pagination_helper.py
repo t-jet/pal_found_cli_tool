@@ -15,16 +15,17 @@ Environment variables:
 import json
 import os
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from foundry_cli.common.log_setup import METADATA_SEPARATOR
-
 
 # Default values (from SRS-001 §5)
 DEFAULT_PAGE_SIZE = int(os.environ.get("FOUNDRY_AGENTIC_CLI_DEFAULT_PAGE_SIZE", "100"))
 HARD_MAX_BATCH_PAGES = 40
 MAX_BATCH_PAGES = min(
-    int(os.environ.get("FOUNDRY_AGENTIC_CLI_MAX_BATCH_PAGES", str(HARD_MAX_BATCH_PAGES))),
+    int(
+        os.environ.get("FOUNDRY_AGENTIC_CLI_MAX_BATCH_PAGES", str(HARD_MAX_BATCH_PAGES))
+    ),
     HARD_MAX_BATCH_PAGES,
 )
 
@@ -50,9 +51,9 @@ class PaginationHelper:
 
     def __init__(
         self,
-        page_size: Optional[int] = None,
-        page_token: Optional[str] = None,
-        batch_pages: Optional[int] = None,
+        page_size: int | None = None,
+        page_token: str | None = None,
+        batch_pages: int | None = None,
     ) -> None:
         self.page_size = self._validate_positive_int(
             "page_size",
@@ -64,7 +65,7 @@ class PaginationHelper:
             batch_pages if batch_pages is not None else 1,
         )
         self.batch_pages = min(raw_batch, MAX_BATCH_PAGES)
-        self._next_page_token: Optional[str] = None
+        self._next_page_token: str | None = None
         self._total_items: int = 0
         self._pages_fetched: int = 0
 
@@ -78,7 +79,7 @@ class PaginationHelper:
         return value
 
     @property
-    def next_page_token(self) -> Optional[str]:
+    def next_page_token(self) -> str | None:
         """Cursor for next page."""
         return self._next_page_token
 
@@ -92,7 +93,7 @@ class PaginationHelper:
         """Number of pages fetched."""
         return self._pages_fetched
 
-    def get_sdk_params(self) -> Dict[str, Any]:
+    def get_sdk_params(self) -> dict[str, Any]:
         """Get pagination parameters for SDK call.
 
         Returns
@@ -100,14 +101,14 @@ class PaginationHelper:
         dict
             SDK-compatible pagination kwargs.
         """
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
         if self.page_size is not None:
             params["page_size"] = self.page_size
         if self.page_token is not None:
             params["page_token"] = self.page_token
         return params
 
-    def _extract_items(self, response: Any) -> List[Any]:
+    def _extract_items(self, response: Any) -> list[Any]:
         """Extract items list from SDK response.
 
         Parameters
@@ -128,7 +129,7 @@ class PaginationHelper:
             return getattr(response, "items", []) or []
         return [response] if response else []
 
-    def _extract_next_token(self, response: Any) -> Optional[str]:
+    def _extract_next_token(self, response: Any) -> str | None:
         """Extract next page token from SDK response.
 
         Parameters
@@ -153,7 +154,7 @@ class PaginationHelper:
         self,
         call_func,
         **call_kwargs,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Execute paginated SDK calls.
 
         Parameters
@@ -168,7 +169,7 @@ class PaginationHelper:
         list
             Aggregated items from all pages.
         """
-        all_items: List[Any] = []
+        all_items: list[Any] = []
         token = self.page_token
 
         for _ in range(self.batch_pages):
@@ -197,7 +198,7 @@ class PaginationHelper:
 
         Writes METADATA_SEPARATOR followed by JSON metadata.
         """
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "pages_fetched": self._pages_fetched,
             "total_items": self._total_items,
         }

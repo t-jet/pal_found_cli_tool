@@ -19,7 +19,7 @@ Format Selection Algorithm (ADR-004)
 import json
 import os
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Environment variable for default format
 ENV_DEFAULT_FORMAT = "FOUNDRY_AGENTIC_CLI_DEFAULT_FORMAT"
@@ -48,10 +48,12 @@ class OutputFormatter:
 
     def __init__(
         self,
-        format_setting: Optional[str] = None,
+        format_setting: str | None = None,
         pretty: bool = False,
     ) -> None:
-        self.format_setting = format_setting or os.environ.get(ENV_DEFAULT_FORMAT, "auto")
+        self.format_setting = format_setting or os.environ.get(
+            ENV_DEFAULT_FORMAT, "auto"
+        )
         self.pretty = pretty
 
     def _select_format(self, data: Any) -> str:
@@ -125,7 +127,7 @@ class OutputFormatter:
             return json.dumps(data, indent=2, default=str)
         return json.dumps(data, default=str)
 
-    def _format_toon(self, data: List[Dict[str, Any]]) -> str:
+    def _format_toon(self, data: list[dict[str, Any]]) -> str:
         """Format data as TOON (tabular output).
 
         TOON format: human-readable table/line format.
@@ -152,8 +154,7 @@ class OutputFormatter:
         for row in data:
             for h in headers:
                 val_len = len(str(row.get(h, "")))
-                if val_len > col_widths[h]:
-                    col_widths[h] = val_len
+                col_widths[h] = max(col_widths[h], val_len)
 
         # Build table
         lines = []
@@ -209,7 +210,7 @@ class OutputFormatter:
 
         return self._format_json(data)
 
-    def format_error(self, error_data: Dict[str, Any]) -> str:
+    def format_error(self, error_data: dict[str, Any]) -> str:
         """Format error data (always JSON per ADR-004).
 
         Parameters
@@ -236,7 +237,7 @@ class OutputFormatter:
         sys.stdout.write(output + "\n")
         sys.stdout.flush()
 
-    def emit_error(self, error_data: Dict[str, Any]) -> None:
+    def emit_error(self, error_data: dict[str, Any]) -> None:
         """Format and emit error data to stderr.
 
         Per ADR-004, error output always goes to stderr (not stdout),

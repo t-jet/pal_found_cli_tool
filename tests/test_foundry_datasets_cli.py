@@ -31,27 +31,32 @@ _SRC = Path(__file__).parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+from foundry_cli.common.access_control_guard import (
+    AccessControlError,
+    AccessControlGuard,
+)
 from foundry_cli.common.config_loader import ConfigLoader
 from foundry_cli.common.error_serializer import (
-    EXIT_SUCCESS,
-    EXIT_USER_INPUT,
-    EXIT_PERMISSION_DENIED,
-    EXIT_NOT_FOUND,
-    EXIT_TIMEOUT,
-    EXIT_SERVER_ERROR,
-    EXIT_RATE_LIMIT,
     EXIT_ACCESS_CONTROL,
     EXIT_CONFIGURATION,
+    EXIT_NOT_FOUND,
+    EXIT_PERMISSION_DENIED,
+    EXIT_RATE_LIMIT,
+    EXIT_SERVER_ERROR,
+    EXIT_SUCCESS,
+    EXIT_TIMEOUT,
+    EXIT_USER_INPUT,
     ErrorSerializer,
 )
 from foundry_cli.common.output_formatter import OutputFormatter
-from foundry_cli.common.access_control_guard import AccessControlGuard, AccessControlError
-
 
 # Import CLI module directly
-_SKILL_DIR = Path(__file__).parent.parent / ".claude" / "skills" / "foundry-datasets" / "scripts"
+_SKILL_DIR = (
+    Path(__file__).parent.parent / ".claude" / "skills" / "foundry-datasets" / "scripts"
+)
 sys.path.insert(0, str(_SKILL_DIR))
 import importlib
+
 foundry_datasets_cli = importlib.import_module("foundry_datasets_cli")
 _model_to_dict = foundry_datasets_cli._model_to_dict
 _get_client = foundry_datasets_cli._get_client
@@ -64,18 +69,36 @@ def _async_client() -> MagicMock:
     """Build a mock SDK client whose coroutine methods are AsyncMock."""
     mc = MagicMock()
     for name in (
-        "create", "get", "get_health_check_reports", "get_health_checks",
-        "get_schedules", "get_schema", "get_schema_batch", "jobs",
-        "put_schema", "read_table", "transactions", "delete", "list",
-        "content", "upload", "abort", "build", "commit", "job",
-        "add_backing_datasets", "add_primary_key",
-        "remove_backing_datasets", "replace_backing_datasets",
+        "create",
+        "get",
+        "get_health_check_reports",
+        "get_health_checks",
+        "get_schedules",
+        "get_schema",
+        "get_schema_batch",
+        "jobs",
+        "put_schema",
+        "read_table",
+        "transactions",
+        "delete",
+        "list",
+        "content",
+        "upload",
+        "abort",
+        "build",
+        "commit",
+        "job",
+        "add_backing_datasets",
+        "add_primary_key",
+        "remove_backing_datasets",
+        "replace_backing_datasets",
     ):
         setattr(mc, name, AsyncMock())
     return mc
 
 
 # --- Test _model_to_dict ---
+
 
 class TestModelToDict:
     """Tests for _model_to_dict helper."""
@@ -116,13 +139,16 @@ class TestModelToDict:
 
 # --- Test _get_client ---
 
+
 class TestGetClient:
     """Tests for _get_client routing."""
 
     def test_dataset_returns_dataset_client(self):
         cfg = MagicMock()
         mock_client = MagicMock()
-        with patch.object(foundry_datasets_cli.AsyncClientFactory, "create", return_value=mock_client):
+        with patch.object(
+            foundry_datasets_cli.AsyncClientFactory, "create", return_value=mock_client
+        ):
             result = _get_client(cfg, "dataset")
             assert result == mock_client.datasets.Dataset
 
@@ -131,7 +157,9 @@ class TestGetClient:
         mock_dataset = MagicMock()
         mock_client = MagicMock()
         mock_client.datasets.Dataset = mock_dataset
-        with patch.object(foundry_datasets_cli.AsyncClientFactory, "create", return_value=mock_client):
+        with patch.object(
+            foundry_datasets_cli.AsyncClientFactory, "create", return_value=mock_client
+        ):
             result = _get_client(cfg, "branch")
             assert result == mock_dataset.Branch
 
@@ -140,7 +168,9 @@ class TestGetClient:
         mock_dataset = MagicMock()
         mock_client = MagicMock()
         mock_client.datasets.Dataset = mock_dataset
-        with patch.object(foundry_datasets_cli.AsyncClientFactory, "create", return_value=mock_client):
+        with patch.object(
+            foundry_datasets_cli.AsyncClientFactory, "create", return_value=mock_client
+        ):
             result = _get_client(cfg, "file")
             assert result == mock_dataset.File
 
@@ -149,7 +179,9 @@ class TestGetClient:
         mock_dataset = MagicMock()
         mock_client = MagicMock()
         mock_client.datasets.Dataset = mock_dataset
-        with patch.object(foundry_datasets_cli.AsyncClientFactory, "create", return_value=mock_client):
+        with patch.object(
+            foundry_datasets_cli.AsyncClientFactory, "create", return_value=mock_client
+        ):
             result = _get_client(cfg, "transaction")
             assert result == mock_dataset.Transaction
 
@@ -158,18 +190,24 @@ class TestGetClient:
         mock_dataset = MagicMock()
         mock_client = MagicMock()
         mock_client.datasets.Dataset = mock_dataset
-        with patch.object(foundry_datasets_cli.AsyncClientFactory, "create", return_value=mock_client):
+        with patch.object(
+            foundry_datasets_cli.AsyncClientFactory, "create", return_value=mock_client
+        ):
             result = _get_client(cfg, "view")
             assert result == mock_dataset.View
 
 
 # --- Test _resolve ---
 
+
 class TestResolve:
     """Tests for kebab-case to snake_case resolution."""
 
     def test_dataset_kebab_ops(self):
-        assert _resolve("dataset", "get-health-check-reports") == "get_health_check_reports"
+        assert (
+            _resolve("dataset", "get-health-check-reports")
+            == "get_health_check_reports"
+        )
         assert _resolve("dataset", "get-health-checks") == "get_health_checks"
         assert _resolve("dataset", "get-schedules") == "get_schedules"
         assert _resolve("dataset", "get-schema") == "get_schema"
@@ -181,7 +219,9 @@ class TestResolve:
         assert _resolve("view", "add-backing-datasets") == "add_backing_datasets"
         assert _resolve("view", "add-primary-key") == "add_primary_key"
         assert _resolve("view", "remove-backing-datasets") == "remove_backing_datasets"
-        assert _resolve("view", "replace-backing-datasets") == "replace_backing_datasets"
+        assert (
+            _resolve("view", "replace-backing-datasets") == "replace_backing_datasets"
+        )
 
     def test_snake_case_passthrough(self):
         """Non-kebab operations pass through unchanged."""
@@ -194,6 +234,7 @@ class TestResolve:
 
 
 # --- Test build_parser ---
+
 
 class TestBuildParser:
     """Tests for argparse parser construction."""
@@ -235,7 +276,9 @@ class TestBuildParser:
 
     def test_dataset_create_options(self):
         parser = build_parser()
-        args = parser.parse_args(["dataset", "create", "--name", "test", "--parent-folder-rid", "folder_rid"])
+        args = parser.parse_args(
+            ["dataset", "create", "--name", "test", "--parent-folder-rid", "folder_rid"]
+        )
         assert args.name == "test"
         assert args.parent_folder_rid == "folder_rid"
 
@@ -257,7 +300,9 @@ class TestBuildParser:
 
     def test_pagination_options_accepted_after_operation(self):
         parser = build_parser()
-        args = parser.parse_args(["dataset", "get", "rid123", "--page-size", "50", "--page-token", "tok123"])
+        args = parser.parse_args(
+            ["dataset", "get", "rid123", "--page-size", "50", "--page-token", "tok123"]
+        )
         assert args.page_size == 50
         assert args.page_token == "tok123"
 
@@ -268,24 +313,33 @@ class TestBuildParser:
 
     def test_kebab_case_operations(self):
         parser = build_parser()
-        args = parser.parse_args(["dataset", "get-health-checks", "rid123", "--branch-name", "main"])
+        args = parser.parse_args(
+            ["dataset", "get-health-checks", "rid123", "--branch-name", "main"]
+        )
         assert args.operation == "get-health-checks"
         assert args.branch_name == "main"
 
     def test_view_operations(self):
         parser = build_parser()
-        args = parser.parse_args([
-            "view", "add-backing-datasets",
-            "--view-dataset-rid", "view_rid",
-            "--backing-datasets", '["rid1", "rid2"]',
-            "--branch", "main"
-        ])
+        args = parser.parse_args(
+            [
+                "view",
+                "add-backing-datasets",
+                "--view-dataset-rid",
+                "view_rid",
+                "--backing-datasets",
+                '["rid1", "rid2"]',
+                "--branch",
+                "main",
+            ]
+        )
         assert args.view_dataset_rid == "view_rid"
         assert args.backing_datasets == '["rid1", "rid2"]'
         assert args.branch == "main"
 
 
 # --- Test _invoke dispatch ---
+
 
 class TestInvoke:
     """Tests for _invoke operation dispatch (async, with timeout param)."""
@@ -296,7 +350,9 @@ class TestInvoke:
         mock_client.create.return_value = {"id": "new_rid"}
         args = argparse.Namespace(name="test", parent_folder_rid="folder", timeout=None)
         await _invoke("dataset", "create", mock_client, args, timeout=None)
-        mock_client.create.assert_called_once_with(name="test", parent_folder_rid="folder", request_timeout=None)
+        mock_client.create.assert_called_once_with(
+            name="test", parent_folder_rid="folder", request_timeout=None
+        )
 
     @pytest.mark.asyncio
     async def test_dataset_create_passes_timeout(self):
@@ -304,42 +360,68 @@ class TestInvoke:
         mock_client = _async_client()
         args = argparse.Namespace(name="t", parent_folder_rid="f", timeout=None)
         await _invoke("dataset", "create", mock_client, args, timeout=42)
-        mock_client.create.assert_called_once_with(name="t", parent_folder_rid="f", request_timeout=42)
+        mock_client.create.assert_called_once_with(
+            name="t", parent_folder_rid="f", request_timeout=42
+        )
 
     @pytest.mark.asyncio
     async def test_dataset_get(self):
         mock_client = _async_client()
         args = argparse.Namespace(dataset_rid="rid123", timeout=None)
         await _invoke("dataset", "get", mock_client, args, timeout=None)
-        mock_client.get.assert_called_once_with(dataset_rid="rid123", request_timeout=None)
+        mock_client.get.assert_called_once_with(
+            dataset_rid="rid123", request_timeout=None
+        )
 
     @pytest.mark.asyncio
     async def test_branch_list(self):
         mock_client = _async_client()
-        args = argparse.Namespace(dataset_rid="rid123", page_size=10, page_token=None, timeout=None)
+        args = argparse.Namespace(
+            dataset_rid="rid123", page_size=10, page_token=None, timeout=None
+        )
         await _invoke("branch", "list", mock_client, args, timeout=None)
-        mock_client.list.assert_called_once_with(dataset_rid="rid123", page_size=10, page_token=None, request_timeout=None)
+        mock_client.list.assert_called_once_with(
+            dataset_rid="rid123", page_size=10, page_token=None, request_timeout=None
+        )
 
     @pytest.mark.asyncio
     async def test_file_get(self):
         mock_client = _async_client()
-        args = argparse.Namespace(dataset_rid="rid123", file_path="/data.csv", transaction_rid=None, timeout=None)
+        args = argparse.Namespace(
+            dataset_rid="rid123",
+            file_path="/data.csv",
+            transaction_rid=None,
+            timeout=None,
+        )
         await _invoke("file", "get", mock_client, args, timeout=None)
-        mock_client.get.assert_called_once_with(dataset_rid="rid123", file_path="/data.csv", transaction_rid=None, request_timeout=None)
+        mock_client.get.assert_called_once_with(
+            dataset_rid="rid123",
+            file_path="/data.csv",
+            transaction_rid=None,
+            request_timeout=None,
+        )
 
     @pytest.mark.asyncio
     async def test_transaction_create(self):
         mock_client = _async_client()
-        args = argparse.Namespace(dataset_rid="rid123", branch_name="main", timeout=None)
+        args = argparse.Namespace(
+            dataset_rid="rid123", branch_name="main", timeout=None
+        )
         await _invoke("transaction", "create", mock_client, args, timeout=None)
-        mock_client.create.assert_called_once_with(dataset_rid="rid123", branch_name="main", request_timeout=None)
+        mock_client.create.assert_called_once_with(
+            dataset_rid="rid123", branch_name="main", request_timeout=None
+        )
 
     @pytest.mark.asyncio
     async def test_view_get(self):
         mock_client = _async_client()
-        args = argparse.Namespace(view_dataset_rid="view_rid", branch="main", timeout=None)
+        args = argparse.Namespace(
+            view_dataset_rid="view_rid", branch="main", timeout=None
+        )
         await _invoke("view", "get", mock_client, args, timeout=None)
-        mock_client.get.assert_called_once_with(view_dataset_rid="view_rid", branch="main", request_timeout=None)
+        mock_client.get.assert_called_once_with(
+            view_dataset_rid="view_rid", branch="main", request_timeout=None
+        )
 
     @pytest.mark.asyncio
     async def test_unknown_operation_raises(self):
@@ -376,7 +458,9 @@ class TestInvoke:
         mock_client = _async_client()
         f = tmp_path / "data.bin"
         f.write_bytes(b"hello")
-        args = argparse.Namespace(dataset_rid="rid", file_path=str(f), transaction_rid=None, timeout=None)
+        args = argparse.Namespace(
+            dataset_rid="rid", file_path=str(f), transaction_rid=None, timeout=None
+        )
         await _invoke("file", "upload", mock_client, args, timeout=None)
         mock_client.upload.assert_called_once()
         kwargs = mock_client.upload.call_args.kwargs
@@ -385,12 +469,15 @@ class TestInvoke:
     @pytest.mark.asyncio
     async def test_file_upload_requires_file_path(self):
         mock_client = _async_client()
-        args = argparse.Namespace(dataset_rid="rid", file_path=None, transaction_rid=None, timeout=None)
+        args = argparse.Namespace(
+            dataset_rid="rid", file_path=None, transaction_rid=None, timeout=None
+        )
         with pytest.raises(ValueError, match="file_path is required"):
             await _invoke("file", "upload", mock_client, args, timeout=None)
 
 
 # --- Test ErrorSerializer integration ---
+
 
 class TestErrorSerializer:
     """Tests for ErrorSerializer exit code mapping."""
@@ -422,6 +509,7 @@ class TestErrorSerializer:
 
 # --- Test OutputFormatter integration ---
 
+
 class TestOutputFormatter:
     """Tests for OutputFormatter format selection."""
 
@@ -450,6 +538,7 @@ class TestOutputFormatter:
 
 # --- Test AccessControlGuard integration ---
 
+
 class TestAccessControlGuard:
     """Tests for access control guard."""
 
@@ -467,6 +556,7 @@ class TestAccessControlGuard:
 
 
 # --- Test main() integration: timeout resolution, retry, operation validation ---
+
 
 class TestMainIntegration:
     """Integration tests for main() covering CODEREVIEW-003 fixes."""
@@ -491,13 +581,15 @@ class TestMainIntegration:
         mock_client = _async_client()
         mock_client.get.return_value = {"rid": "x"}
 
-        with patch.object(foundry_datasets_cli, "_get_client", return_value=mock_client), \
-             patch.object(foundry_datasets_cli, "ConfigLoader") as cfg_cls, \
-             patch.object(foundry_datasets_cli, "AccessControlGuard") as guard_cls, \
-             patch.object(foundry_datasets_cli, "RetryHandler") as rh_cls, \
-             patch.object(foundry_datasets_cli, "LogSetup"), \
-             patch.object(foundry_datasets_cli, "OutputFormatter") as of_cls, \
-             patch("builtins.print"):
+        with (
+            patch.object(foundry_datasets_cli, "_get_client", return_value=mock_client),
+            patch.object(foundry_datasets_cli, "ConfigLoader") as cfg_cls,
+            patch.object(foundry_datasets_cli, "AccessControlGuard") as guard_cls,
+            patch.object(foundry_datasets_cli, "RetryHandler") as rh_cls,
+            patch.object(foundry_datasets_cli, "LogSetup"),
+            patch.object(foundry_datasets_cli, "OutputFormatter") as of_cls,
+            patch("builtins.print"),
+        ):
             cfg = MagicMock()
             cfg.timeout_s = 30
             cfg.log_level = "INFO"
@@ -512,8 +604,9 @@ class TestMainIntegration:
             of.format.return_value = "{}"
             of_cls.return_value = of
 
-            with patch.object(sys, "argv",
-                              ["prog", "dataset", "get", "rid", "--timeout", "77"]):
+            with patch.object(
+                sys, "argv", ["prog", "dataset", "get", "rid", "--timeout", "77"]
+            ):
                 rc = await foundry_datasets_cli.main()
 
         assert rc == EXIT_SUCCESS
@@ -530,13 +623,15 @@ class TestMainIntegration:
         """WARNING-2: when --timeout omitted, cfg.timeout_s is used."""
         mock_client = _async_client()
 
-        with patch.object(foundry_datasets_cli, "_get_client", return_value=mock_client), \
-             patch.object(foundry_datasets_cli, "ConfigLoader") as cfg_cls, \
-             patch.object(foundry_datasets_cli, "AccessControlGuard") as guard_cls, \
-             patch.object(foundry_datasets_cli, "RetryHandler") as rh_cls, \
-             patch.object(foundry_datasets_cli, "LogSetup"), \
-             patch.object(foundry_datasets_cli, "OutputFormatter") as of_cls, \
-             patch("builtins.print"):
+        with (
+            patch.object(foundry_datasets_cli, "_get_client", return_value=mock_client),
+            patch.object(foundry_datasets_cli, "ConfigLoader") as cfg_cls,
+            patch.object(foundry_datasets_cli, "AccessControlGuard") as guard_cls,
+            patch.object(foundry_datasets_cli, "RetryHandler") as rh_cls,
+            patch.object(foundry_datasets_cli, "LogSetup"),
+            patch.object(foundry_datasets_cli, "OutputFormatter") as of_cls,
+            patch("builtins.print"),
+        ):
             cfg = MagicMock()
             cfg.timeout_s = 99
             cfg.log_level = "INFO"
@@ -563,13 +658,15 @@ class TestMainIntegration:
         """WARNING-1: RetryHandler.execute wraps the SDK call (ADR-002)."""
         mock_client = _async_client()
 
-        with patch.object(foundry_datasets_cli, "_get_client", return_value=mock_client), \
-             patch.object(foundry_datasets_cli, "ConfigLoader") as cfg_cls, \
-             patch.object(foundry_datasets_cli, "AccessControlGuard") as guard_cls, \
-             patch.object(foundry_datasets_cli, "RetryHandler") as rh_cls, \
-             patch.object(foundry_datasets_cli, "LogSetup"), \
-             patch.object(foundry_datasets_cli, "OutputFormatter") as of_cls, \
-             patch("builtins.print"):
+        with (
+            patch.object(foundry_datasets_cli, "_get_client", return_value=mock_client),
+            patch.object(foundry_datasets_cli, "ConfigLoader") as cfg_cls,
+            patch.object(foundry_datasets_cli, "AccessControlGuard") as guard_cls,
+            patch.object(foundry_datasets_cli, "RetryHandler") as rh_cls,
+            patch.object(foundry_datasets_cli, "LogSetup"),
+            patch.object(foundry_datasets_cli, "OutputFormatter") as of_cls,
+            patch("builtins.print"),
+        ):
             cfg = MagicMock()
             cfg.timeout_s = 30
             cfg.log_level = "INFO"
@@ -594,11 +691,13 @@ class TestMainIntegration:
     async def test_main_access_control_denied(self):
         """AccessControlError → EXIT_ACCESS_CONTROL."""
         mock_client = _async_client()
-        with patch.object(foundry_datasets_cli, "_get_client", return_value=mock_client), \
-             patch.object(foundry_datasets_cli, "ConfigLoader") as cfg_cls, \
-             patch.object(foundry_datasets_cli, "AccessControlGuard") as guard_cls, \
-             patch.object(foundry_datasets_cli, "LogSetup"), \
-             patch.object(foundry_datasets_cli, "ErrorSerializer") as ser_cls:
+        with (
+            patch.object(foundry_datasets_cli, "_get_client", return_value=mock_client),
+            patch.object(foundry_datasets_cli, "ConfigLoader") as cfg_cls,
+            patch.object(foundry_datasets_cli, "AccessControlGuard") as guard_cls,
+            patch.object(foundry_datasets_cli, "LogSetup"),
+            patch.object(foundry_datasets_cli, "ErrorSerializer") as ser_cls,
+        ):
             cfg = MagicMock()
             cfg.timeout_s = 30
             cfg.log_level = "INFO"
@@ -619,13 +718,15 @@ class TestMainIntegration:
     async def test_main_handles_unknown_operation_as_server_error(self):
         """Unknown operation surfaces a ValueError → EXIT_SERVER_ERROR."""
         mock_client = _async_client()
-        with patch.object(foundry_datasets_cli, "_get_client", return_value=mock_client), \
-             patch.object(foundry_datasets_cli, "ConfigLoader") as cfg_cls, \
-             patch.object(foundry_datasets_cli, "AccessControlGuard") as guard_cls, \
-             patch.object(foundry_datasets_cli, "RetryHandler") as rh_cls, \
-             patch.object(foundry_datasets_cli, "LogSetup"), \
-             patch.object(foundry_datasets_cli, "ErrorSerializer") as ser_cls, \
-             patch.object(foundry_datasets_cli, "OutputFormatter"):
+        with (
+            patch.object(foundry_datasets_cli, "_get_client", return_value=mock_client),
+            patch.object(foundry_datasets_cli, "ConfigLoader") as cfg_cls,
+            patch.object(foundry_datasets_cli, "AccessControlGuard") as guard_cls,
+            patch.object(foundry_datasets_cli, "RetryHandler") as rh_cls,
+            patch.object(foundry_datasets_cli, "LogSetup"),
+            patch.object(foundry_datasets_cli, "ErrorSerializer") as ser_cls,
+            patch.object(foundry_datasets_cli, "OutputFormatter"),
+        ):
             cfg = MagicMock()
             cfg.timeout_s = 30
             cfg.log_level = "INFO"
@@ -633,7 +734,9 @@ class TestMainIntegration:
             guard = MagicMock()
             guard_cls.return_value = guard
             rh = MagicMock()
-            rh.execute = AsyncMock(side_effect=ValueError("Unknown operation: dataset.bogus"))
+            rh.execute = AsyncMock(
+                side_effect=ValueError("Unknown operation: dataset.bogus")
+            )
             rh_cls.return_value = rh
             ser = MagicMock()
             ser.serialize.return_value = EXIT_SERVER_ERROR
@@ -645,7 +748,9 @@ class TestMainIntegration:
                 # Force the parsed namespace to carry a bogus operation so _resolve
                 # yields an unknown op — but the parser validates, so instead we
                 # patch _resolve directly.
-                with patch.object(foundry_datasets_cli, "_resolve", return_value="bogus"):
+                with patch.object(
+                    foundry_datasets_cli, "_resolve", return_value="bogus"
+                ):
                     rc = await foundry_datasets_cli.main()
 
         assert rc == EXIT_SERVER_ERROR
@@ -653,15 +758,26 @@ class TestMainIntegration:
 
 # --- Exhaustive _invoke branch coverage ---
 
+
 def _ns(**kwargs):
     """Build a Namespace with all _invoke attributes defaulted to None."""
     base = dict(
-        dataset_rid=None, branch_name=None, transaction_rid=None,
-        page_size=None, page_token=None, file_path=None,
-        view_dataset_rid=None, branch=None, name=None,
-        parent_folder_rid=None, dataset_rids=None, schema=None,
-        backing_datasets=None, primary_key=None,
-        end_transaction_rid=None, start_transaction_rid=None,
+        dataset_rid=None,
+        branch_name=None,
+        transaction_rid=None,
+        page_size=None,
+        page_token=None,
+        file_path=None,
+        view_dataset_rid=None,
+        branch=None,
+        name=None,
+        parent_folder_rid=None,
+        dataset_rids=None,
+        schema=None,
+        backing_datasets=None,
+        primary_key=None,
+        end_transaction_rid=None,
+        start_transaction_rid=None,
     )
     base.update(kwargs)
     return argparse.Namespace(**base)
@@ -671,7 +787,12 @@ def _ns(**kwargs):
 _INVOKE_CASES = [
     ("dataset", "create", "create", dict(name="n", parent_folder_rid="f")),
     ("dataset", "get", "get", dict(dataset_rid="r")),
-    ("dataset", "get_health_check_reports", "get_health_check_reports", dict(dataset_rid="r")),
+    (
+        "dataset",
+        "get_health_check_reports",
+        "get_health_check_reports",
+        dict(dataset_rid="r"),
+    ),
     ("dataset", "get_health_checks", "get_health_checks", dict(dataset_rid="r")),
     ("dataset", "get_schedules", "get_schedules", dict(dataset_rid="r")),
     ("dataset", "get_schema", "get_schema", dict(dataset_rid="r")),
@@ -694,13 +815,25 @@ _INVOKE_CASES = [
     ("transaction", "create", "create", dict(dataset_rid="r")),
     ("transaction", "get", "get", dict(dataset_rid="r", transaction_rid="t")),
     ("transaction", "job", "job", dict(dataset_rid="r", transaction_rid="t")),
-    ("view", "add_primary_key", "add_primary_key",
-     dict(view_dataset_rid="v", primary_key='["a"]', branch="b")),
+    (
+        "view",
+        "add_primary_key",
+        "add_primary_key",
+        dict(view_dataset_rid="v", primary_key='["a"]', branch="b"),
+    ),
     ("view", "create", "create", dict(name="n", parent_folder_rid="f")),
-    ("view", "remove_backing_datasets", "remove_backing_datasets",
-     dict(view_dataset_rid="v", backing_datasets='["r"]', branch="b")),
-    ("view", "replace_backing_datasets", "replace_backing_datasets",
-     dict(view_dataset_rid="v", backing_datasets='["r"]', branch="b")),
+    (
+        "view",
+        "remove_backing_datasets",
+        "remove_backing_datasets",
+        dict(view_dataset_rid="v", backing_datasets='["r"]', branch="b"),
+    ),
+    (
+        "view",
+        "replace_backing_datasets",
+        "replace_backing_datasets",
+        dict(view_dataset_rid="v", backing_datasets='["r"]', branch="b"),
+    ),
 ]
 
 
@@ -718,10 +851,18 @@ async def test_invoke_all_operations_dispatch(resource, op, attr, ns_kwargs):
 async def test_invoke_file_content_operation():
     """file.content passes start/end transaction rids."""
     mc = _async_client()
-    await _invoke("file", "content", mc,
-                  _ns(dataset_rid="r", file_path="/p",
-                      end_transaction_rid="et", start_transaction_rid="st"),
-                  timeout=None)
+    await _invoke(
+        "file",
+        "content",
+        mc,
+        _ns(
+            dataset_rid="r",
+            file_path="/p",
+            end_transaction_rid="et",
+            start_transaction_rid="st",
+        ),
+        timeout=None,
+    )
     mc.content.assert_awaited_once()
     kwargs = mc.content.call_args.kwargs
     assert kwargs["end_transaction_rid"] == "et"
@@ -731,17 +872,24 @@ async def test_invoke_file_content_operation():
 @pytest.mark.asyncio
 async def test_invoke_view_add_backing_datasets():
     mc = _async_client()
-    await _invoke("view", "add_backing_datasets", mc,
-                  _ns(view_dataset_rid="v", backing_datasets='["r"]', branch="b"),
-                  timeout=None)
+    await _invoke(
+        "view",
+        "add_backing_datasets",
+        mc,
+        _ns(view_dataset_rid="v", backing_datasets='["r"]', branch="b"),
+        timeout=None,
+    )
     mc.add_backing_datasets.assert_awaited_once()
 
 
 # --- main() exception handler coverage ---
 
+
 def _patch_main_infra(monkeypatch, *, cfg_timeout=30):
     """Patch shared infrastructure so main() can be exercised end-to-end."""
-    monkeypatch.setattr(foundry_datasets_cli, "ConfigLoader", lambda: _StubCfg(cfg_timeout))
+    monkeypatch.setattr(
+        foundry_datasets_cli, "ConfigLoader", lambda: _StubCfg(cfg_timeout)
+    )
     monkeypatch.setattr(foundry_datasets_cli, "LogSetup", _StubLog)
     monkeypatch.setattr(foundry_datasets_cli, "AccessControlGuard", _StubGuard)
     return monkeypatch
@@ -751,6 +899,7 @@ class _StubCfg:
     def __init__(self, timeout_s=30):
         self.timeout_s = timeout_s
         self.log_level = "INFO"
+
     def load(self):
         return None
 
@@ -765,6 +914,7 @@ class _StubGuard:
     def __init__(self, cfg, ns):
         self.cfg = cfg
         self.ns = ns
+
     def check(self, *a, **kw):
         return None
 
@@ -811,8 +961,11 @@ async def test_main_generic_exception_path(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_main_client_creation_failure(monkeypatch):
-    monkeypatch.setattr(foundry_datasets_cli, "_get_client",
-                        lambda c, r: (_ for _ in ()).throw(RuntimeError("no cfg")))
+    monkeypatch.setattr(
+        foundry_datasets_cli,
+        "_get_client",
+        lambda c, r: (_ for _ in ()).throw(RuntimeError("no cfg")),
+    )
     _patch_main_infra(monkeypatch)
     monkeypatch.setattr(sys, "argv", ["prog", "dataset", "get", "rid"])
     rc = await foundry_datasets_cli.main()
@@ -828,8 +981,9 @@ async def test_main_success_prints_output(monkeypatch, capsys):
     rh.execute = AsyncMock(return_value={"rid": "x"})
     monkeypatch.setattr(foundry_datasets_cli, "RetryHandler", lambda: rh)
     _patch_main_infra(monkeypatch)
-    monkeypatch.setattr(sys, "argv",
-                        ["prog", "dataset", "get", "rid", "--format", "json"])
+    monkeypatch.setattr(
+        sys, "argv", ["prog", "dataset", "get", "rid", "--format", "json"]
+    )
     rc = await foundry_datasets_cli.main()
     assert rc == EXIT_SUCCESS
     out = capsys.readouterr().out
@@ -837,6 +991,7 @@ async def test_main_success_prints_output(monkeypatch, capsys):
 
 
 # --- Test path resolution robustness (MINOR-2) ---
+
 
 class TestPathResolution:
     """Smoke test that the project root was discovered without crashing."""

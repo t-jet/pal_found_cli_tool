@@ -12,12 +12,11 @@ Never searches home directory.
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Type, TypeVar
+from typing import TypeVar
 
 from dotenv import load_dotenv
 
 from foundry_cli.common.log_setup import DEFAULT_LOG_LEVEL, ENV_LOG_LEVEL
-
 
 # Environment variable names
 ENV_ENV_FILE = "FOUNDRY_AGENTIC_CLI_ENV_FILE"
@@ -69,7 +68,7 @@ class ConfigLoader:
     """
 
     def __init__(self) -> None:
-        self._loaded_file: Optional[str] = None
+        self._loaded_file: str | None = None
 
     def load(self) -> None:
         """Load configuration following ADR-006 search path."""
@@ -104,7 +103,7 @@ class ConfigLoader:
         # Order 4 — Env vars only
         # No error — credentials may be in shell environment
 
-    def _find_git_root(self, max_depth: int = 20) -> Optional[Path]:
+    def _find_git_root(self, max_depth: int = 20) -> Path | None:
         """Walk up from CWD to find .git directory.
 
         Parameters
@@ -131,7 +130,7 @@ class ConfigLoader:
 
     # --- Typed accessors (generic, follow story AC) ---
 
-    def get_str(self, name: str, default: Optional[str] = None) -> Optional[str]:
+    def get_str(self, name: str, default: str | None = None) -> str | None:
         """Get string environment variable value.
 
         Parameters
@@ -175,7 +174,7 @@ class ConfigLoader:
             return default
         return val.strip().lower() in _TRUTHY
 
-    def get_int(self, name: str, default: Optional[int] = None) -> Optional[int]:
+    def get_int(self, name: str, default: int | None = None) -> int | None:
         """Get integer environment variable value.
 
         Parameters
@@ -198,7 +197,7 @@ class ConfigLoader:
         except ValueError:
             return default
 
-    def get_float(self, name: str, default: Optional[float] = None) -> Optional[float]:
+    def get_float(self, name: str, default: float | None = None) -> float | None:
         """Get float environment variable value.
 
         Parameters
@@ -221,7 +220,9 @@ class ConfigLoader:
         except ValueError:
             return default
 
-    def get_enum(self, name: str, enum_cls: Type[_E], default: Optional[_E] = None) -> Optional[_E]:
+    def get_enum(
+        self, name: str, enum_cls: type[_E], default: _E | None = None
+    ) -> _E | None:
         """Get enum environment variable value (case-insensitive).
 
         Parameters
@@ -254,7 +255,7 @@ class ConfigLoader:
 
     # --- Legacy helper aliases (kept for backward compatibility) ---
 
-    def get_env(self, name: str, default: Optional[str] = None) -> Optional[str]:
+    def get_env(self, name: str, default: str | None = None) -> str | None:
         """Get raw environment variable value (alias of :meth:`get_str`)."""
         return self.get_str(name, default)
 
@@ -265,12 +266,12 @@ class ConfigLoader:
     # --- Property accessors ---
 
     @property
-    def token(self) -> Optional[str]:
+    def token(self) -> str | None:
         """FOUNDRY_TOKEN value."""
         return os.environ.get(ENV_TOKEN)
 
     @property
-    def hostname(self) -> Optional[str]:
+    def hostname(self) -> str | None:
         """FOUNDRY_HOSTNAME value."""
         return os.environ.get(ENV_HOSTNAME)
 
@@ -312,7 +313,7 @@ class ConfigLoader:
         return os.environ.get(ENV_ENABLE_ATTRIBUTION, "").lower() in _TRUTHY
 
     @property
-    def attribution_rids(self) -> Optional[str]:
+    def attribution_rids(self) -> str | None:
         """Comma-separated attribution RIDs."""
         return os.environ.get(ENV_ATTRIBUTION_RIDS)
 
@@ -360,7 +361,7 @@ class ConfigLoader:
         return Path(value)
 
     @property
-    def loaded_file(self) -> Optional[str]:
+    def loaded_file(self) -> str | None:
         """Path to loaded .env file, or None."""
         return self._loaded_file
 

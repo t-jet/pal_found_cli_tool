@@ -21,40 +21,47 @@ _SRC = Path(__file__).parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+from foundry_cli.common.async_client_factory import AsyncClientFactory
+from foundry_cli.common.auth_provider import AuthProvider
 from foundry_cli.common.config_loader import (
+    DEFAULT_FORMAT,
+    DEFAULT_MAX_TIMEOUT_S,
+    DEFAULT_MIN_TIMEOUT_S,
+    DEFAULT_TIMEOUT_S,
+    ENV_ATTRIBUTION_RIDS,
+    ENV_DEFAULT_FORMAT,
+    ENV_ENABLE_ATTRIBUTION,
+    ENV_ENABLE_TRACING,
+    ENV_ENV_FILE,
+    ENV_HOSTNAME,
+    ENV_METADATA_ONLY,
+    ENV_READONLY,
+    ENV_TIMEOUT_S,
+    ENV_TOKEN,
+    EXIT_CONFIGURATION,
     ConfigLoader,
     ConfigurationError,
-    ENV_ENV_FILE,
-    ENV_TOKEN,
-    ENV_HOSTNAME,
-    ENV_TIMEOUT_S,
-    ENV_DEFAULT_FORMAT,
-    ENV_READONLY,
-    ENV_METADATA_ONLY,
-    ENV_ENABLE_ATTRIBUTION,
-    ENV_ATTRIBUTION_RIDS,
-    ENV_ENABLE_TRACING,
-    DEFAULT_TIMEOUT_S,
-    DEFAULT_MIN_TIMEOUT_S,
-    DEFAULT_MAX_TIMEOUT_S,
-    DEFAULT_FORMAT,
-    EXIT_CONFIGURATION,
 )
-from foundry_cli.common.auth_provider import AuthProvider
-from foundry_cli.common.async_client_factory import AsyncClientFactory
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def clean_env(monkeypatch):
     """Strip all FOUNDRY_* env vars for a clean test environment."""
     keys = [
-        ENV_ENV_FILE, ENV_TOKEN, ENV_HOSTNAME, ENV_TIMEOUT_S,
-        ENV_DEFAULT_FORMAT, ENV_READONLY, ENV_METADATA_ONLY,
-        ENV_ENABLE_ATTRIBUTION, ENV_ATTRIBUTION_RIDS, ENV_ENABLE_TRACING,
+        ENV_ENV_FILE,
+        ENV_TOKEN,
+        ENV_HOSTNAME,
+        ENV_TIMEOUT_S,
+        ENV_DEFAULT_FORMAT,
+        ENV_READONLY,
+        ENV_METADATA_ONLY,
+        ENV_ENABLE_ATTRIBUTION,
+        ENV_ATTRIBUTION_RIDS,
+        ENV_ENABLE_TRACING,
     ]
     for key in keys:
         monkeypatch.delenv(key, raising=False)
@@ -79,16 +86,14 @@ def mock_sdk():
 def env_file(tmp_path):
     """Create a minimal .env file with credentials."""
     f = tmp_path / ".env"
-    f.write_text(
-        "FOUNDRY_TOKEN=tok\n"
-        "FOUNDRY_HOSTNAME=https://h\n"
-    )
+    f.write_text("FOUNDRY_TOKEN=tok\nFOUNDRY_HOSTNAME=https://h\n")
     return f
 
 
 # ===========================================================================
 # ConfigLoader — Unit Tests
 # ===========================================================================
+
 
 class TestConfigLoaderExplicitEnv:
     """Search path order 1: Explicit path via FOUNDRY_AGENTIC_CLI_ENV_FILE."""
@@ -98,7 +103,9 @@ class TestConfigLoaderExplicitEnv:
     ):
         """Explicit .env path exists → loads and sets loaded_file."""
         f = tmp_path / "custom.env"
-        f.write_text("FOUNDRY_TOKEN=tok_explicit\nFOUNDRY_HOSTNAME=https://h_explicit\n")
+        f.write_text(
+            "FOUNDRY_TOKEN=tok_explicit\nFOUNDRY_HOSTNAME=https://h_explicit\n"
+        )
         monkeypatch.setenv(ENV_ENV_FILE, str(f))
         cfg = ConfigLoader()
         cfg.load()
@@ -106,9 +113,7 @@ class TestConfigLoaderExplicitEnv:
         assert cfg.token == "tok_explicit"
         assert cfg.hostname == "https://h_explicit"
 
-    def test_explicit_env_file_not_found_raises(
-        self, clean_env, monkeypatch
-    ):
+    def test_explicit_env_file_not_found_raises(self, clean_env, monkeypatch):
         """Explicit .env path does not exist → ConfigurationError."""
         monkeypatch.setenv(ENV_ENV_FILE, "/does/not/exist/.env")
         cfg = ConfigLoader()
@@ -126,7 +131,9 @@ class TestConfigLoaderExplicitEnv:
         git_root = tmp_path / "repo"
         git_root.mkdir()
         (git_root / ".git").mkdir()
-        (git_root / ".env").write_text("FOUNDRY_TOKEN=git_tok\nFOUNDRY_HOSTNAME=https://git\n")
+        (git_root / ".env").write_text(
+            "FOUNDRY_TOKEN=git_tok\nFOUNDRY_HOSTNAME=https://git\n"
+        )
         monkeypatch.chdir(git_root)
         cfg = ConfigLoader()
         cfg.load()
@@ -137,14 +144,14 @@ class TestConfigLoaderExplicitEnv:
 class TestConfigLoaderGitRoot:
     """Search path order 2: Git root .env detection."""
 
-    def test_git_root_env_detected_from_subdir(
-        self, clean_env, monkeypatch, tmp_path
-    ):
+    def test_git_root_env_detected_from_subdir(self, clean_env, monkeypatch, tmp_path):
         """CWD is a subdirectory of git root with .env → loads from git root."""
         root = tmp_path / "repo"
         root.mkdir()
         (root / ".git").mkdir()
-        (root / ".env").write_text("FOUNDRY_TOKEN=git_tok\nFOUNDRY_HOSTNAME=https://git\n")
+        (root / ".env").write_text(
+            "FOUNDRY_TOKEN=git_tok\nFOUNDRY_HOSTNAME=https://git\n"
+        )
         sub = root / "a" / "b" / "c"
         sub.mkdir(parents=True)
         monkeypatch.chdir(sub)
@@ -153,9 +160,7 @@ class TestConfigLoaderGitRoot:
         assert cfg.loaded_file == str(root / ".env")
         assert cfg.token == "git_tok"
 
-    def test_git_root_no_env_file_falls_to_cwd(
-        self, clean_env, monkeypatch, tmp_path
-    ):
+    def test_git_root_no_env_file_falls_to_cwd(self, clean_env, monkeypatch, tmp_path):
         """Git root found but no .env there → falls to CWD .env."""
         root = tmp_path / "repo"
         root.mkdir()
@@ -163,7 +168,9 @@ class TestConfigLoaderGitRoot:
         # No .env at git root
         sub = root / "src"
         sub.mkdir()
-        (sub / ".env").write_text("FOUNDRY_TOKEN=cwd_tok\nFOUNDRY_HOSTNAME=https://cwd\n")
+        (sub / ".env").write_text(
+            "FOUNDRY_TOKEN=cwd_tok\nFOUNDRY_HOSTNAME=https://cwd\n"
+        )
         monkeypatch.chdir(sub)
         cfg = ConfigLoader()
         cfg.load()
@@ -181,9 +188,7 @@ class TestConfigLoaderGitRoot:
         result = cfg._find_git_root()
         assert result is None
 
-    def test_find_git_root_max_depth_20(
-        self, clean_env, monkeypatch, tmp_path
-    ):
+    def test_find_git_root_max_depth_20(self, clean_env, monkeypatch, tmp_path):
         """Deep tree exceeding max_depth → returns None."""
         deep = tmp_path
         for i in range(25):
@@ -213,9 +218,7 @@ class TestConfigLoaderGitRoot:
 class TestConfigLoaderFallback:
     """Search path orders 3-4: CWD fallback, env vars only."""
 
-    def test_cwd_env_fallback(
-        self, clean_env, monkeypatch, tmp_path
-    ):
+    def test_cwd_env_fallback(self, clean_env, monkeypatch, tmp_path):
         """Non-git dir with .env in CWD → loads from CWD."""
         d = tmp_path / "proj"
         d.mkdir()
@@ -226,9 +229,7 @@ class TestConfigLoaderFallback:
         assert cfg.loaded_file == str(d / ".env")
         assert cfg.token == "cwd_tok"
 
-    def test_no_env_file_uses_shell_env_only(
-        self, clean_env, monkeypatch, tmp_path
-    ):
+    def test_no_env_file_uses_shell_env_only(self, clean_env, monkeypatch, tmp_path):
         """No .env anywhere → reads from shell env vars."""
         d = tmp_path / "bare"
         d.mkdir()
@@ -241,9 +242,7 @@ class TestConfigLoaderFallback:
         assert cfg.token == "shell_tok"
         assert cfg.hostname == "https://shell"
 
-    def test_no_env_file_no_creds_returns_none(
-        self, clean_env, monkeypatch, tmp_path
-    ):
+    def test_no_env_file_no_creds_returns_none(self, clean_env, monkeypatch, tmp_path):
         """No .env, no shell env → token/hostname return None."""
         d = tmp_path / "empty"
         d.mkdir()
@@ -257,9 +256,7 @@ class TestConfigLoaderFallback:
 class TestConfigLoaderShellPrecedence:
     """Shell env vars take precedence (override=False)."""
 
-    def test_shell_env_overrides_dotenv(
-        self, clean_env, monkeypatch, env_file
-    ):
+    def test_shell_env_overrides_dotenv(self, clean_env, monkeypatch, env_file):
         """Shell env var set before load_dotenv → takes precedence."""
         monkeypatch.setenv(ENV_ENV_FILE, str(env_file))
         monkeypatch.setenv(ENV_TOKEN, "shell_wins")
@@ -346,7 +343,9 @@ class TestConfigLoaderPropertyAccessors:
         assert cfg.global_metadata_only is True, f"Expected True for '{val}'"
 
     @pytest.mark.parametrize("val", ["false", "0", "", "off"])
-    def test_global_metadata_only_parses_false_values(self, clean_env, monkeypatch, val):
+    def test_global_metadata_only_parses_false_values(
+        self, clean_env, monkeypatch, val
+    ):
         cfg = ConfigLoader()
         monkeypatch.setenv(ENV_METADATA_ONLY, val)
         assert cfg.global_metadata_only is False, f"Expected False for '{val}'"
@@ -386,6 +385,7 @@ class TestConfigLoaderPropertyAccessors:
 
     def test_log_level_default(self, clean_env):
         from foundry_cli.common.log_setup import DEFAULT_LOG_LEVEL
+
         cfg = ConfigLoader()
         assert cfg.log_level == DEFAULT_LOG_LEVEL
 
@@ -502,6 +502,7 @@ class TestConfigLoaderTypedAccessors:
 
     def test_get_enum_by_value(self, clean_env, monkeypatch):
         """Value-match path: env string equals a member value (not a name)."""
+
         class Mode(Enum):
             FAST = "speed"
             SLOW = "turtle"
@@ -613,9 +614,7 @@ class TestConfigLoaderEnvironmentVariables:
 class TestConfigLoaderHierarchyResolution:
     """Config value hierarchy: explicit > git root > CWD > shell env."""
 
-    def test_hierarchy_explicit_over_git_root(
-        self, clean_env, monkeypatch, tmp_path
-    ):
+    def test_hierarchy_explicit_over_git_root(self, clean_env, monkeypatch, tmp_path):
         """Explicit path wins over git root .env."""
         explicit = tmp_path / "explicit.env"
         explicit.write_text("FOUNDRY_TOKEN=explicit_tok\n")
@@ -629,9 +628,7 @@ class TestConfigLoaderHierarchyResolution:
         cfg.load()
         assert cfg.token == "explicit_tok"
 
-    def test_hierarchy_git_root_over_cwd(
-        self, clean_env, monkeypatch, tmp_path
-    ):
+    def test_hierarchy_git_root_over_cwd(self, clean_env, monkeypatch, tmp_path):
         """Git root .env wins over CWD .env."""
         root = tmp_path / "repo"
         root.mkdir()
@@ -649,6 +646,7 @@ class TestConfigLoaderHierarchyResolution:
 # ===========================================================================
 # AuthProvider — Unit Tests
 # ===========================================================================
+
 
 class TestAuthProviderValidate:
     """AuthProvider.validate() static method."""
@@ -723,6 +721,7 @@ class TestAuthProviderGetAuth:
     def test_get_auth_takes_only_token_argument(self, mock_sdk):
         """get_auth signature is get_auth(token) — no dead hostname param (A2)."""
         import inspect
+
         sig = inspect.signature(AuthProvider.get_auth)
         assert list(sig.parameters) == ["token"]
 
@@ -740,6 +739,7 @@ class TestAuthProviderGetAuth:
     def test_get_auth_has_return_type_annotation(self):
         """get_auth must declare a return type (A3)."""
         import inspect
+
         sig = inspect.signature(AuthProvider.get_auth)
         assert sig.return_annotation is not inspect.Signature.empty
 
@@ -763,10 +763,13 @@ class TestAuthProviderSecurity:
 # AsyncClientFactory — Unit Tests
 # ===========================================================================
 
+
 class TestAsyncClientFactoryCreate:
     """AsyncClientFactory.create() — core client creation."""
 
-    def test_create_returns_client_with_valid_config(self, clean_env, monkeypatch, mock_sdk):
+    def test_create_returns_client_with_valid_config(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """Valid token + hostname → returns client."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
         monkeypatch.setenv(ENV_HOSTNAME, "https://host")
@@ -877,6 +880,7 @@ class TestAsyncClientFactoryCreate:
     def test_create_has_return_type_annotation(self):
         """create() must declare a return type (F4)."""
         import inspect
+
         sig = inspect.signature(AsyncClientFactory.create)
         assert sig.return_annotation is not inspect.Signature.empty
 
@@ -913,7 +917,9 @@ class TestAsyncClientFactoryAttribution:
         call_kwargs = mock_fc.call_args[1]
         assert "attribution_rids" not in call_kwargs
 
-    def test_create_attribution_enabled_but_no_rids(self, clean_env, monkeypatch, mock_sdk):
+    def test_create_attribution_enabled_but_no_rids(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """ENABLE_ATTRIBUTION=true but no attribution_rids → no injection."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
         monkeypatch.setenv(ENV_HOSTNAME, "https://host")
@@ -927,7 +933,9 @@ class TestAsyncClientFactoryAttribution:
         call_kwargs = mock_fc.call_args[1]
         assert "attribution_rids" not in call_kwargs
 
-    def test_create_attribution_rids_single_value(self, clean_env, monkeypatch, mock_sdk):
+    def test_create_attribution_rids_single_value(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """Single attribution RID → single-element list."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
         monkeypatch.setenv(ENV_HOSTNAME, "https://host")
@@ -941,7 +949,9 @@ class TestAsyncClientFactoryAttribution:
         call_kwargs = mock_fc.call_args[1]
         assert call_kwargs["attribution_rids"] == ["single-rid"]
 
-    def test_create_attribution_rids_strips_whitespace(self, clean_env, monkeypatch, mock_sdk):
+    def test_create_attribution_rids_strips_whitespace(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """Attribution RIDs with surrounding whitespace are stripped (F5)."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
         monkeypatch.setenv(ENV_HOSTNAME, "https://host")
@@ -964,7 +974,9 @@ class TestAsyncClientFactoryStatelessness:
         # The class itself must not expose a mutable singleton attribute
         assert not hasattr(AsyncClientFactory, "_instance")
 
-    def test_create_returns_fresh_instance_each_call(self, clean_env, monkeypatch, mock_sdk):
+    def test_create_returns_fresh_instance_each_call(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """Each create() returns a distinct client; no caching across calls."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
         monkeypatch.setenv(ENV_HOSTNAME, "https://host")
@@ -977,7 +989,9 @@ class TestAsyncClientFactoryStatelessness:
         # Two construction calls = two distinct clients
         assert mock_fc.call_count == 2
 
-    def test_two_factory_instances_are_independent(self, clean_env, monkeypatch, mock_sdk):
+    def test_two_factory_instances_are_independent(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """Separate factory instances do not share cached clients (F2)."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
         monkeypatch.setenv(ENV_HOSTNAME, "https://host")
@@ -1014,7 +1028,9 @@ class TestAsyncClientFactoryStatelessness:
 class TestAsyncClientFactoryConfigLoaderInjection:
     """AsyncClientFactory — ConfigLoader dependency injection."""
 
-    def test_create_accepts_config_loader_instance(self, clean_env, monkeypatch, mock_sdk):
+    def test_create_accepts_config_loader_instance(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """factory.create() accepts a ConfigLoader instance."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
         monkeypatch.setenv(ENV_HOSTNAME, "https://host")
@@ -1044,6 +1060,7 @@ class TestAsyncClientFactoryConfigLoaderInjection:
 # ConfigurationError — Edge Cases
 # ===========================================================================
 
+
 class TestConfigurationError:
     """ConfigurationError exception class."""
 
@@ -1072,6 +1089,7 @@ class TestConfigurationError:
 # ===========================================================================
 # Integration — Component Chain (Unit-Level)
 # ===========================================================================
+
 
 class TestUnitLevelChain:
     """Unit-level chain: ConfigLoader → AuthProvider → AsyncClientFactory."""

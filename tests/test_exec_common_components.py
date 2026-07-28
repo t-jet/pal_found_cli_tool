@@ -26,15 +26,15 @@ _SRC = Path(__file__).parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from foundry_cli.common.config_loader import ConfigLoader, ConfigurationError
-from foundry_cli.common.auth_provider import AuthProvider
 from foundry_cli.common.async_client_factory import AsyncClientFactory
+from foundry_cli.common.auth_provider import AuthProvider
+from foundry_cli.common.config_loader import ConfigLoader, ConfigurationError
 from foundry_cli.common.error_serializer import EXIT_CONFIGURATION
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def reset_async_client_factory():
@@ -46,7 +46,8 @@ def reset_async_client_factory():
 def clean_env(monkeypatch):
     """Clear all FOUNDRY_* env vars for a clean test environment."""
     keys_to_clear = [
-        "FOUNDRY_TOKEN", "FOUNDRY_HOSTNAME",
+        "FOUNDRY_TOKEN",
+        "FOUNDRY_HOSTNAME",
         "FOUNDRY_AGENTIC_CLI_ENV_FILE",
         "FOUNDRY_AGENTIC_CLI_TIMEOUT_S",
         "FOUNDRY_AGENTIC_CLI_DEFAULT_FORMAT",
@@ -95,14 +96,19 @@ def env_file_with_credentials(tmp_path):
 # SUITE 1: ConfigLoader Integration Tests (11 tests)
 # ===========================================================================
 
+
 class TestConfigLoaderIntegration:
     """TC-CL-INT-001 through TC-CL-INT-011."""
 
     # TC-CL-INT-001: Explicit .env file via FOUNDRY_AGENTIC_CLI_ENV_FILE
-    def test_TC_CL_INT_001_explicit_env_file(self, clean_env, monkeypatch, env_file_with_credentials):
+    def test_TC_CL_INT_001_explicit_env_file(
+        self, clean_env, monkeypatch, env_file_with_credentials
+    ):
         """Given an explicit .env path, When ConfigLoader.load() is called,
         Then it loads from that path and sets loaded_file."""
-        monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_ENV_FILE", str(env_file_with_credentials))
+        monkeypatch.setenv(
+            "FOUNDRY_AGENTIC_CLI_ENV_FILE", str(env_file_with_credentials)
+        )
         cfg = ConfigLoader()
         cfg.load()
         assert cfg.loaded_file == str(env_file_with_credentials)
@@ -125,7 +131,9 @@ class TestConfigLoaderIntegration:
         git_root = tmp_path / "repo"
         git_root.mkdir()
         (git_root / ".git").mkdir()
-        (git_root / ".env").write_text("FOUNDRY_TOKEN=git_root_token\nFOUNDRY_HOSTNAME=https://git.example.com\n")
+        (git_root / ".env").write_text(
+            "FOUNDRY_TOKEN=git_root_token\nFOUNDRY_HOSTNAME=https://git.example.com\n"
+        )
         sub_dir = git_root / "src" / "deep"
         sub_dir.mkdir(parents=True)
         monkeypatch.chdir(sub_dir)
@@ -140,7 +148,9 @@ class TestConfigLoaderIntegration:
         Then it loads .env from CWD as fallback."""
         cwd_dir = tmp_path / "no_git"
         cwd_dir.mkdir()
-        (cwd_dir / ".env").write_text("FOUNDRY_TOKEN=cwd_token\nFOUNDRY_HOSTNAME=https://cwd.example.com\n")
+        (cwd_dir / ".env").write_text(
+            "FOUNDRY_TOKEN=cwd_token\nFOUNDRY_HOSTNAME=https://cwd.example.com\n"
+        )
         monkeypatch.chdir(cwd_dir)
         cfg = ConfigLoader()
         cfg.load()
@@ -148,10 +158,14 @@ class TestConfigLoaderIntegration:
         assert cfg.token == "cwd_token"
 
     # TC-CL-INT-005: Shell env vars take precedence over .env (override=False)
-    def test_TC_CL_INT_005_shell_env_precedence(self, clean_env, monkeypatch, env_file_with_credentials):
+    def test_TC_CL_INT_005_shell_env_precedence(
+        self, clean_env, monkeypatch, env_file_with_credentials
+    ):
         """Given .env with token and shell env with different token,
         When ConfigLoader.load() is called, Then shell env takes precedence."""
-        monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_ENV_FILE", str(env_file_with_credentials))
+        monkeypatch.setenv(
+            "FOUNDRY_AGENTIC_CLI_ENV_FILE", str(env_file_with_credentials)
+        )
         monkeypatch.setenv("FOUNDRY_TOKEN", "shell_token_override")
         cfg = ConfigLoader()
         cfg.load()
@@ -178,7 +192,9 @@ class TestConfigLoaderIntegration:
         assert cfg.timeout_s == 120
 
     # TC-CL-INT-007: Typed accessor — timeout_s with non-numeric returns default
-    def test_TC_CL_INT_007_timeout_invalid_returns_default(self, clean_env, monkeypatch):
+    def test_TC_CL_INT_007_timeout_invalid_returns_default(
+        self, clean_env, monkeypatch
+    ):
         """Given non-numeric timeout value, When accessed, Then returns default 30."""
         monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_TIMEOUT_S", "not_a_number")
         cfg = ConfigLoader()
@@ -259,6 +275,7 @@ class TestConfigLoaderIntegration:
 # SUITE 2: AuthProvider Integration Tests (6 tests)
 # ===========================================================================
 
+
 class TestAuthProviderIntegration:
     """TC-AP-INT-001 through TC-AP-INT-006."""
 
@@ -266,7 +283,9 @@ class TestAuthProviderIntegration:
     def test_TC_AP_INT_001_validate_both_present(self):
         """Given valid token and hostname, When validate() called,
         Then returns (True, None)."""
-        is_valid, error = AuthProvider.validate("my_token", "https://foundry.example.com")
+        is_valid, error = AuthProvider.validate(
+            "my_token", "https://foundry.example.com"
+        )
         assert is_valid is True
         assert error is None
 
@@ -319,11 +338,14 @@ class TestAuthProviderIntegration:
 # SUITE 3: AsyncClientFactory Integration Tests (7 tests)
 # ===========================================================================
 
+
 class TestAsyncClientFactoryIntegration:
     """TC-ACF-INT-001 through TC-ACF-INT-007."""
 
     # TC-ACF-INT-001: create() with valid config returns client
-    def test_TC_ACF_INT_001_create_with_valid_config(self, clean_env, monkeypatch, mock_sdk):
+    def test_TC_ACF_INT_001_create_with_valid_config(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """Given ConfigLoader with valid credentials, When factory.create() called,
         Then returns a FoundryClient instance."""
         monkeypatch.setenv("FOUNDRY_TOKEN", "test_token")
@@ -349,7 +371,9 @@ class TestAsyncClientFactoryIntegration:
             factory.create(cfg)
 
     # TC-ACF-INT-003: create() with attribution enabled injects attribution_rids
-    def test_TC_ACF_INT_003_create_with_attribution(self, clean_env, monkeypatch, mock_sdk):
+    def test_TC_ACF_INT_003_create_with_attribution(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """Given config with attribution enabled, When factory.create() called,
         Then attribution RIDs are set on the SDK context variable."""
         monkeypatch.setenv("FOUNDRY_TOKEN", "test_token")
@@ -363,10 +387,14 @@ class TestAsyncClientFactoryIntegration:
         client = factory.create(cfg)
         call_kwargs = mock_fc.call_args[1]
         assert "attribution_rids" not in call_kwargs
-        mock_sdk_mod.ATTRIBUTION_VAR.set.assert_called_once_with(["rid1", "rid2", "rid3"])
+        mock_sdk_mod.ATTRIBUTION_VAR.set.assert_called_once_with(
+            ["rid1", "rid2", "rid3"]
+        )
 
     # TC-ACF-INT-004: create() without attribution does NOT inject attribution_rids
-    def test_TC_ACF_INT_004_create_without_attribution(self, clean_env, monkeypatch, mock_sdk):
+    def test_TC_ACF_INT_004_create_without_attribution(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """Given config with attribution disabled, When factory.create() called,
         Then attribution_rids are NOT in client kwargs."""
         monkeypatch.setenv("FOUNDRY_TOKEN", "test_token")
@@ -381,7 +409,9 @@ class TestAsyncClientFactoryIntegration:
         assert "attribution_rids" not in call_kwargs
 
     # TC-ACF-INT-005: create() is stateless per invocation
-    def test_TC_ACF_INT_005_create_returns_fresh_client(self, clean_env, monkeypatch, mock_sdk):
+    def test_TC_ACF_INT_005_create_returns_fresh_client(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """Given a client was created, When create() is called again,
         Then a fresh SDK client is constructed."""
         monkeypatch.setenv("FOUNDRY_TOKEN", "test_token")
@@ -404,7 +434,9 @@ class TestAsyncClientFactoryIntegration:
         assert factory.last_client is None
 
     # TC-ACF-INT-007: last_client exposes the most recent client
-    def test_TC_ACF_INT_007_last_client_tracks_latest(self, clean_env, monkeypatch, mock_sdk):
+    def test_TC_ACF_INT_007_last_client_tracks_latest(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """Given a client was created, When last_client is read,
         Then it returns the most recent client."""
         monkeypatch.setenv("FOUNDRY_TOKEN", "test_token")
@@ -420,6 +452,7 @@ class TestAsyncClientFactoryIntegration:
 # ===========================================================================
 # SUITE 4: Integration Chain Tests (5 tests)
 # ===========================================================================
+
 
 class TestIntegrationChain:
     """TC-CHAIN-001 through TC-CHAIN-005."""
@@ -462,10 +495,14 @@ class TestIntegrationChain:
         assert err is not None
 
     # TC-CHAIN-004: Chain with .env file loading through to client creation
-    def test_TC_CHAIN_004_chain_with_env_file(self, clean_env, monkeypatch, env_file_with_credentials, mock_sdk):
+    def test_TC_CHAIN_004_chain_with_env_file(
+        self, clean_env, monkeypatch, env_file_with_credentials, mock_sdk
+    ):
         """Given credentials in .env file, When full chain executed from .env,
         Then client is created with values from .env file."""
-        monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_ENV_FILE", str(env_file_with_credentials))
+        monkeypatch.setenv(
+            "FOUNDRY_AGENTIC_CLI_ENV_FILE", str(env_file_with_credentials)
+        )
         cfg = ConfigLoader()
         cfg.load()
         assert cfg.token == "test_token_123"
@@ -476,7 +513,9 @@ class TestIntegrationChain:
         assert client is not None
 
     # TC-CHAIN-005: Chain with attribution through full pipeline
-    def test_TC_CHAIN_005_chain_with_attribution(self, clean_env, monkeypatch, mock_sdk):
+    def test_TC_CHAIN_005_chain_with_attribution(
+        self, clean_env, monkeypatch, mock_sdk
+    ):
         """Given config with attribution enabled, When full chain executed,
         Then attribution RIDs are set on the SDK context variable."""
         monkeypatch.setenv("FOUNDRY_TOKEN", "attr_token")
@@ -499,11 +538,14 @@ class TestIntegrationChain:
 # SUITE 5: E2E Scenario Tests (5 tests)
 # ===========================================================================
 
+
 class TestE2EScenarios:
     """TC-E2E-001 through TC-E2E-005."""
 
     # TC-E2E-001: E2E — ConfigLoader loads from git root, AuthProvider validates, client created
-    def test_TC_E2E_001_git_root_to_client(self, clean_env, monkeypatch, tmp_path, mock_sdk):
+    def test_TC_E2E_001_git_root_to_client(
+        self, clean_env, monkeypatch, tmp_path, mock_sdk
+    ):
         """Given a git repo with .env containing credentials,
         When ConfigLoader finds git root, AuthProvider validates, factory creates client,
         Then the full pipeline succeeds from git root."""
@@ -511,8 +553,7 @@ class TestE2EScenarios:
         git_root.mkdir()
         (git_root / ".git").mkdir()
         (git_root / ".env").write_text(
-            "FOUNDRY_TOKEN=e2e_token\n"
-            "FOUNDRY_HOSTNAME=https://e2e.example.com\n"
+            "FOUNDRY_TOKEN=e2e_token\nFOUNDRY_HOSTNAME=https://e2e.example.com\n"
         )
         src_dir = git_root / "src"
         src_dir.mkdir()
@@ -527,7 +568,9 @@ class TestE2EScenarios:
         assert client is not None
 
     # TC-E2E-002: E2E — Environment-only (no .env file) pipeline
-    def test_TC_E2E_002_env_only_pipeline(self, clean_env, monkeypatch, tmp_path, mock_sdk):
+    def test_TC_E2E_002_env_only_pipeline(
+        self, clean_env, monkeypatch, tmp_path, mock_sdk
+    ):
         """Given credentials only in shell env (no .env),
         When full pipeline runs, Then client is created from shell env."""
         non_git_dir = tmp_path / "no_git_no_env"
@@ -564,15 +607,21 @@ class TestE2EScenarios:
         assert "secret_token_xyz" not in err_missing
 
     # TC-E2E-004: E2E — Explicit .env file override takes priority over git root
-    def test_TC_E2E_004_explicit_over_git_root(self, clean_env, monkeypatch, tmp_path, env_file_with_credentials):
+    def test_TC_E2E_004_explicit_over_git_root(
+        self, clean_env, monkeypatch, tmp_path, env_file_with_credentials
+    ):
         """Given both explicit .env path AND git root .env,
         When ConfigLoader loads, Then explicit path takes priority."""
         git_root = tmp_path / "repo"
         git_root.mkdir()
         (git_root / ".git").mkdir()
-        (git_root / ".env").write_text("FOUNDRY_TOKEN=git_token\nFOUNDRY_HOSTNAME=https://git.example.com\n")
+        (git_root / ".env").write_text(
+            "FOUNDRY_TOKEN=git_token\nFOUNDRY_HOSTNAME=https://git.example.com\n"
+        )
         monkeypatch.chdir(git_root)
-        monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_ENV_FILE", str(env_file_with_credentials))
+        monkeypatch.setenv(
+            "FOUNDRY_AGENTIC_CLI_ENV_FILE", str(env_file_with_credentials)
+        )
         cfg = ConfigLoader()
         cfg.load()
         # Should load from explicit path, NOT git root

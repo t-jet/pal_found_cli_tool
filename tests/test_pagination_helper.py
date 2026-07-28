@@ -26,15 +26,15 @@ _SRC = Path(__file__).parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from foundry_cli.common.pagination_helper import (  # noqa: E402
+from foundry_cli.common.pagination_helper import (
     MAX_BATCH_PAGES,
     PaginationHelper,
 )
 
-
 # ===========================================================================
 # Dict extraction regression (DEV-004 bug #2)
 # ===========================================================================
+
 
 class TestExtractItemsDict:
     """_extract_items must read a dict's "items" key, not its .items() method."""
@@ -63,7 +63,9 @@ class TestExtractNextTokenDict:
 
     def test_dict_next_page_token(self):
         helper = PaginationHelper()
-        assert helper._extract_next_token({"items": [], "next_page_token": "tok"}) == "tok"
+        assert (
+            helper._extract_next_token({"items": [], "next_page_token": "tok"}) == "tok"
+        )
 
     def test_dict_next_page_token_camel(self):
         helper = PaginationHelper()
@@ -77,6 +79,7 @@ class TestExtractNextTokenDict:
 # ===========================================================================
 # Object (Pydantic-style) extraction still works
 # ===========================================================================
+
 
 class TestExtractItemsObject:
     """_extract_items falls back to attribute access for non-dict responses."""
@@ -95,6 +98,7 @@ class TestExtractItemsObject:
 # ===========================================================================
 # Batch aggregation (FR-PAG-4, FR-PAG-5)
 # ===========================================================================
+
 
 class TestBatchAggregation:
     """paginate aggregates across pages up to batch_pages."""
@@ -199,6 +203,7 @@ class TestPageSizeValidation:
 # SDK param propagation (FR-PAG-3)
 # ===========================================================================
 
+
 class TestSdkParams:
     """get_sdk_params forwards page_size and page_token."""
 
@@ -226,7 +231,11 @@ class TestSdkParams:
             return {"items": ["third"], "next_page_token": None}
 
         helper = PaginationHelper(page_size=25, batch_pages=3)
-        assert await helper.paginate(fake, dataset_rid="rid") == ["first", "second", "third"]
+        assert await helper.paginate(fake, dataset_rid="rid") == [
+            "first",
+            "second",
+            "third",
+        ]
         assert calls == [
             {"dataset_rid": "rid", "page_size": 25},
             {"dataset_rid": "rid", "page_size": 25, "page_token": "tok1"},
@@ -250,6 +259,7 @@ class TestSdkParams:
 # emit_metadata to stderr (ADR-005, FR-PAG-2)
 # ===========================================================================
 
+
 class TestEmitMetadata:
     """emit_metadata writes the separator + JSON metadata to stderr."""
 
@@ -263,6 +273,7 @@ class TestEmitMetadata:
         lines = captured.err.strip().splitlines()
         # First line is the ADR-005 metadata separator.
         from foundry_cli.common.log_setup import METADATA_SEPARATOR
+
         assert lines[0] == METADATA_SEPARATOR
         payload = json.loads(lines[1])
         assert payload["pages_fetched"] == 2
@@ -290,6 +301,7 @@ class TestEmitMetadata:
         captured = capsys.readouterr()
         lines = captured.err.strip().splitlines()
         from foundry_cli.common.log_setup import METADATA_SEPARATOR
+
         assert lines[0] == METADATA_SEPARATOR
         assert json.loads(lines[1]) == {
             "pages_fetched": 1,

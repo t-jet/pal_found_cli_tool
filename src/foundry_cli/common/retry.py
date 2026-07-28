@@ -35,9 +35,10 @@ import logging
 import os
 import random
 import signal
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Optional, Set, Tuple, Type, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import requests
 
@@ -71,7 +72,7 @@ ENV_TIMEOUT_S = "FOUNDRY_AGENTIC_CLI_TIMEOUT_S"
 DEFAULT_TIMEOUT_S = 30.0
 
 # HTTP status codes that MUST trigger retry per FR-ERR-3.
-RETRYABLE_HTTP_STATUSES: Set[int] = {429, 503}
+RETRYABLE_HTTP_STATUSES: set[int] = {429, 503}
 
 # Legacy aliases retained for older tests/call sites. The canonical names above
 # are authoritative; these constants are not read from the environment.
@@ -129,7 +130,7 @@ def _is_retryable_http_status(exception: BaseException) -> bool:
     return status in RETRYABLE_HTTP_STATUSES
 
 
-def _get_http_status(exception: BaseException) -> Optional[int]:
+def _get_http_status(exception: BaseException) -> int | None:
     """Extract an HTTP status code from an exception response, if present."""
     response = getattr(exception, "response", None)
     if response is None:
@@ -153,9 +154,9 @@ def _signal_name(signum: int) -> str:
 class _SignalCancellationScope:
     """Scoped SIGINT/SIGTERM handlers for one active async attempt."""
 
-    def __init__(self, loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
+    def __init__(self, loop: asyncio.AbstractEventLoop | None = None) -> None:
         self.loop = loop
-        self.signum: Optional[int] = None
+        self.signum: int | None = None
         self._previous: dict[int, Any] = {}
         self._installed: list[tuple[int, str]] = []
 
@@ -207,7 +208,7 @@ class _SignalCancellationScope:
 # Default retryable exception types. Broad transport errors are kept as the
 # outer net, but HTTP-status-aware retrying is layered on top via
 # ``_should_retry`` which inspects 429/503 first (FR-ERR-3, BUG-SUB-002).
-DEFAULT_RETRY_EXCEPTIONS: Tuple[Type[BaseException], ...] = (
+DEFAULT_RETRY_EXCEPTIONS: tuple[type[BaseException], ...] = (
     requests.RequestException,
     requests.ConnectionError,
     asyncio.TimeoutError,
@@ -247,7 +248,7 @@ def _calculate_delay(
     float
         Calculated delay in **seconds** (ready for ``asyncio.sleep``).
     """
-    delay_ms = min(initial_delay_ms * (multiplier ** attempt), max_delay_ms)
+    delay_ms = min(initial_delay_ms * (multiplier**attempt), max_delay_ms)
     delay_s = delay_ms / 1000.0
 
     if jitter:
@@ -303,42 +304,50 @@ class RetryHandler:
 
     def __init__(
         self,
-        max_retries: Optional[int] = None,
-        base_delay: Optional[float] = None,
-        max_delay: Optional[float] = None,
-        multiplier: Optional[float] = None,
-        jitter: Optional[bool] = None,
-        retry_on: Optional[Tuple[Type[BaseException], ...]] = None,
-        timeout_s: Optional[float] = ...,  # type: ignore[assignment]
+        max_retries: int | None = None,
+        base_delay: float | None = None,
+        max_delay: float | None = None,
+        multiplier: float | None = None,
+        jitter: bool | None = None,
+        retry_on: tuple[type[BaseException], ...] | None = None,
+        timeout_s: float | None = ...,  # type: ignore[assignment]
     ) -> None:
         # ``max_retries`` is accepted for call-site backwards compatibility;
         # canonical name going forward is "max_attempts".
-        self.max_retries = max_retries if max_retries is not None else int(
-            os.environ.get(ENV_MAX_ATTEMPTS, DEFAULT_MAX_ATTEMPTS)
+        self.max_retries = (
+            max_retries
+            if max_retries is not None
+            else int(os.environ.get(ENV_MAX_ATTEMPTS, DEFAULT_MAX_ATTEMPTS))
         )
         # Delays are read from canonical *_MS env vars. Accept explicit
         # constructor overrides in **milliseconds** to match the env contract.
-        self.base_delay_ms = base_delay if base_delay is not None else float(
-            os.environ.get(ENV_INITIAL_DELAY_MS, DEFAULT_INITIAL_DELAY_MS)
+        self.base_delay_ms = (
+            base_delay
+            if base_delay is not None
+            else float(os.environ.get(ENV_INITIAL_DELAY_MS, DEFAULT_INITIAL_DELAY_MS))
         )
-        self.max_delay_ms = max_delay if max_delay is not None else float(
-            os.environ.get(ENV_MAX_DELAY_MS, DEFAULT_MAX_DELAY_MS)
+        self.max_delay_ms = (
+            max_delay
+            if max_delay is not None
+            else float(os.environ.get(ENV_MAX_DELAY_MS, DEFAULT_MAX_DELAY_MS))
         )
-        self.multiplier = multiplier if multiplier is not None else float(
-            os.environ.get(ENV_MULTIPLIER, DEFAULT_MULTIPLIER)
+        self.multiplier = (
+            multiplier
+            if multiplier is not None
+            else float(os.environ.get(ENV_MULTIPLIER, DEFAULT_MULTIPLIER))
         )
-        self.jitter = jitter if jitter is not None else _parse_bool_env(
-            ENV_JITTER, DEFAULT_JITTER
+        self.jitter = (
+            jitter
+            if jitter is not None
+            else _parse_bool_env(ENV_JITTER, DEFAULT_JITTER)
         )
         self.retry_on = retry_on if retry_on is not None else DEFAULT_RETRY_EXCEPTIONS
         # Sentinel default: when caller passes nothing, read env var or fall
         # back to the canonical timeout. ``None`` explicitly disables the
         # wait_for wrapper (used by unit tests that want raw control).
         if timeout_s is ...:
-            timeout_s = float(
-                os.environ.get(ENV_TIMEOUT_S, DEFAULT_TIMEOUT_S)
-            )
-        self.timeout_s: Optional[float] = timeout_s
+            timeout_s = float(os.environ.get(ENV_TIMEOUT_S, DEFAULT_TIMEOUT_S))
+        self.timeout_s: float | None = timeout_s
 
     # Backwards-compatible alias: ``base_delay``/``max_delay`` historically
     # returned seconds. To preserve existing call sites and repr output we
@@ -427,7 +436,7 @@ class RetryHandler:
         BaseException
             The last exception raised if all retries are exhausted.
         """
-        last_exception: Optional[BaseException] = None
+        last_exception: BaseException | None = None
 
         for attempt in range(self.max_retries + 1):
             signal_scope = _SignalCancellationScope()
@@ -539,7 +548,7 @@ class RetryHandler:
 
 
 def install_signal_cancellation(
-    loop: Optional[asyncio.AbstractEventLoop] = None,
+    loop: asyncio.AbstractEventLoop | None = None,
 ) -> Callable[[], None]:
     """Install SIGINT/SIGTERM handlers that cancel the running task.
 

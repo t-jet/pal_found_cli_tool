@@ -13,7 +13,7 @@ import unicodedata
 import uuid
 from collections.abc import AsyncIterable
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -116,13 +116,13 @@ class BinaryDownloadHandler:
         # consistent with the protection applied to ``root`` above.
         self._restrict_directory(download_dir)
         final_path = (download_dir / filename).resolve()
-        if final_path.parent != download_dir.resolve() or not final_path.is_relative_to(root):
+        if final_path.parent != download_dir.resolve() or not final_path.is_relative_to(
+            root
+        ):
             self._remove_empty_directory(download_dir)
             raise InvalidDownloadError("Download filename escapes configured path")
 
-        known_size = self._applicable_content_length(
-            content_length, content_encoding
-        )
+        known_size = self._applicable_content_length(content_length, content_encoding)
         truncated = known_size is not None and known_size > limit
         source_size_at_least: int | None = None
         bytes_seen = 0
@@ -145,7 +145,9 @@ class BinaryDownloadHandler:
                         continue
 
                     observation_limit = (
-                        limit if known_size is not None and known_size > limit else limit + 1
+                        limit
+                        if known_size is not None and known_size > limit
+                        else limit + 1
                     )
                     remaining_probe = observation_limit - bytes_seen
                     observed = chunk[:remaining_probe]
@@ -157,12 +159,22 @@ class BinaryDownloadHandler:
                         sha256.update(writable)
                         bytes_written += len(writable)
 
-                    if bytes_seen > limit or (known_size is not None and known_size > limit and bytes_written == limit):
+                    if bytes_seen > limit or (
+                        known_size is not None
+                        and known_size > limit
+                        and bytes_written == limit
+                    ):
                         truncated = True
                         break
 
-                if known_size is not None and known_size > limit and bytes_written < limit:
-                    raise DownloadError("Download stream ended before the declared prefix was received")
+                if (
+                    known_size is not None
+                    and known_size > limit
+                    and bytes_written < limit
+                ):
+                    raise DownloadError(
+                        "Download stream ended before the declared prefix was received"
+                    )
 
                 await self._close_stream(chunks)
                 stream_closed = True
@@ -237,12 +249,14 @@ class BinaryDownloadHandler:
     ) -> str:
         if original_filename is None or not original_filename.strip():
             extension = mimetypes.guess_extension(mime_type or "") or ".bin"
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
             original_filename = f"{namespace}_{operation}_{timestamp}{extension}"
         if "\x00" in original_filename or any(
             separator in original_filename for separator in ("/", "\\")
         ):
-            raise InvalidDownloadError("Download filename contains a forbidden separator")
+            raise InvalidDownloadError(
+                "Download filename contains a forbidden separator"
+            )
         candidate = Path(original_filename)
         if candidate.is_absolute() or original_filename in {".", ".."}:
             raise InvalidDownloadError("Download filename must be a relative basename")

@@ -12,7 +12,7 @@ import tempfile
 import unicodedata
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Protocol, cast
 
@@ -153,7 +153,9 @@ class _AliasLock:
 
     def __enter__(self) -> _AliasLock:
         if not self.acquire(blocking=True):
-            raise SessionError(f"Could not acquire session alias lock: {self.path.name}")
+            raise SessionError(
+                f"Could not acquire session alias lock: {self.path.name}"
+            )
         return self
 
     def __exit__(self, *_args: object) -> None:
@@ -206,8 +208,10 @@ class SessionManager:
             remote = await create_remote()
             session_id = getattr(remote, "rid", None)
             if not isinstance(session_id, str) or not session_id.strip():
-                raise SessionPersistenceError("Remote session did not return a valid rid")
-            now = datetime.now(timezone.utc).isoformat()
+                raise SessionPersistenceError(
+                    "Remote session did not return a valid rid"
+                )
+            now = datetime.now(UTC).isoformat()
             state = SessionState(
                 session_id=session_id,
                 agent_rid=agent_rid,
@@ -281,10 +285,10 @@ class SessionManager:
 
     def cleanup_expired(self, now: datetime | None = None) -> int:
         """Delete records inactive for the configured UTC expiry period."""
-        current_time = now or datetime.now(timezone.utc)
+        current_time = now or datetime.now(UTC)
         if current_time.tzinfo is None or current_time.utcoffset() is None:
             raise ValueError("now must be timezone-aware")
-        current_time = current_time.astimezone(timezone.utc)
+        current_time = current_time.astimezone(UTC)
         deleted = 0
         for path in self.session_root.glob("*.json"):
             canonical = path.stem
@@ -320,7 +324,9 @@ class SessionManager:
             or normalized in {".", ".."}
             or "/" in normalized
             or "\\" in normalized
-            or any(ord(character) < 32 or ord(character) == 127 for character in normalized)
+            or any(
+                ord(character) < 32 or ord(character) == 127 for character in normalized
+            )
             or _ALIAS_PATTERN.fullmatch(normalized) is None
             or normalized.split(".", maxsplit=1)[0] in _WINDOWS_RESERVED
         ):
@@ -363,7 +369,14 @@ class SessionManager:
             )
             self._validate_state(state)
             return state
-        except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError, KeyError) as exc:
+        except (
+            OSError,
+            UnicodeError,
+            json.JSONDecodeError,
+            TypeError,
+            ValueError,
+            KeyError,
+        ) as exc:
             logger.warning(
                 "Removed corrupt session state",
                 extra={"session_alias": canonical},
@@ -382,7 +395,9 @@ class SessionManager:
         temp_path = Path(raw_temp_path)
         try:
             with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as target:
-                json.dump(state.to_dict(), target, ensure_ascii=True, separators=(",", ":"))
+                json.dump(
+                    state.to_dict(), target, ensure_ascii=True, separators=(",", ":")
+                )
                 target.write("\n")
                 target.flush()
                 os.fsync(target.fileno())
@@ -413,7 +428,7 @@ class SessionManager:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         if parsed.tzinfo is None or parsed.utcoffset() is None:
             raise ValueError("session timestamps must include a UTC offset")
-        return parsed.astimezone(timezone.utc)
+        return parsed.astimezone(UTC)
 
     @staticmethod
     def _required_string(raw: dict[str, Any], key: str) -> str:
@@ -424,7 +439,9 @@ class SessionManager:
 
     @staticmethod
     def _tool_history(value: Any) -> list[dict[str, Any]]:
-        if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        if not isinstance(value, list) or not all(
+            isinstance(item, dict) for item in value
+        ):
             raise ValueError("tool_history must be a list of objects")
         return cast(list[dict[str, Any]], value)
 

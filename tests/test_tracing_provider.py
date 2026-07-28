@@ -14,7 +14,7 @@ SRC = Path(__file__).parents[1] / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from foundry_cli.common.tracing_provider import (  # noqa: E402
+from foundry_cli.common.tracing_provider import (
     B3Context,
     InvalidTraceContextError,
     TracingProvider,

@@ -25,8 +25,9 @@ import logging
 import os
 import sys
 import traceback
+from importlib import import_module
 import uuid
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ class _SDKNetworkError(Exception):
     """Legacy internal placeholder for SDK network error (deprecated)."""
 
 
-def _register_sdk_exceptions() -> Dict[Type[BaseException], int]:
+def _register_sdk_exceptions() -> dict[type[BaseException], int]:
     """Build an exit-code map that includes real SDK exceptions if available.
 
     The foundry-platform-python SDK exposes ``PalantirRPCException`` subclasses
@@ -110,7 +111,7 @@ def _register_sdk_exceptions() -> Dict[Type[BaseException], int]:
     Dict[Type[BaseException], int]
         Mapping of exception classes to ADR-001 exit codes.
     """
-    mapping: Dict[Type[BaseException], int] = {
+    mapping: dict[type[BaseException], int] = {
         # Auth errors -> code 2
         _SDKAuthError: EXIT_AUTH,
         # Validation -> code 1 (UserInputError in ADR-001)
@@ -155,7 +156,7 @@ def _register_sdk_exceptions() -> Dict[Type[BaseException], int]:
     # SDK is not importable, HTTP status code classification in
     # `_classify_http_exception` remains the primary mapping path.
     try:
-        from foundry_platform_python import errors as _sdk_errors  # type: ignore[import-not-found]
+        _sdk_errors = import_module("foundry_sdk.errors")
     except ImportError:
         return mapping
 
@@ -183,7 +184,7 @@ def _register_sdk_exceptions() -> Dict[Type[BaseException], int]:
 
 
 # Map exception classes to ADR-001 exit codes (computed at import time).
-_EXCEPTION_TO_EXIT_CODE: Dict[Type[BaseException], int] = _register_sdk_exceptions()
+_EXCEPTION_TO_EXIT_CODE: dict[type[BaseException], int] = _register_sdk_exceptions()
 
 
 class ErrorSerializer:
@@ -214,7 +215,7 @@ class ErrorSerializer:
     ...     sys.exit(exit_code)
     """
 
-    def __init__(self, call_id: Optional[str] = None) -> None:
+    def __init__(self, call_id: str | None = None) -> None:
         """Initialize ErrorSerializer.
 
         Parameters
@@ -224,9 +225,7 @@ class ErrorSerializer:
         """
         self.call_id = call_id or str(uuid.uuid4())
 
-    def _get_http_status_from_exception(
-        self, exception: BaseException
-    ) -> Optional[int]:
+    def _get_http_status_from_exception(self, exception: BaseException) -> int | None:
         """Extract HTTP status code from an exception if available.
 
         Parameters
@@ -243,9 +242,7 @@ class ErrorSerializer:
             return getattr(exception.response, "status_code", None)
         return None
 
-    def _classify_http_exception(
-        self, exception: BaseException
-    ) -> Optional[int]:
+    def _classify_http_exception(self, exception: BaseException) -> int | None:
         """Classify HTTP exceptions based on status code.
 
         Parameters
@@ -307,7 +304,10 @@ class ErrorSerializer:
             exit_code = http_exit
         else:
             declared_exit_code = getattr(exception, "exit_code", None)
-            if isinstance(declared_exit_code, int) and declared_exit_code in EXIT_CODE_NAMES:
+            if (
+                isinstance(declared_exit_code, int)
+                and declared_exit_code in EXIT_CODE_NAMES
+            ):
                 exit_code = declared_exit_code
             # Walk MRO for exception type matching
             else:
@@ -335,7 +335,7 @@ class ErrorSerializer:
         else:
             traceback_str = ""
 
-        error_envelope: Dict[str, Any] = {
+        error_envelope: dict[str, Any] = {
             "error": True,
             "exit_code": exit_code,
             "exit_code_name": exit_code_name,
@@ -356,7 +356,8 @@ class ErrorSerializer:
             safe_metadata = {
                 key: value
                 for key, value in diagnostic_metadata.items()
-                if key in safe_keys and isinstance(value, (str, int, float, bool, type(None)))
+                if key in safe_keys
+                and isinstance(value, (str, int, float, bool, type(None)))
             }
             if safe_metadata:
                 error_envelope["details"] = safe_metadata
@@ -398,8 +399,8 @@ class ErrorSerializer:
         exit_code: int,
         message: str,
         exception_type: str = "UnknownError",
-        call_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        call_id: str | None = None,
+    ) -> dict[str, Any]:
         """Create a JSON error envelope without an exception object.
 
         Parameters

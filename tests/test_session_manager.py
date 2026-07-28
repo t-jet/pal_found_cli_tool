@@ -7,7 +7,7 @@ import json
 import logging
 import sys
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -30,7 +30,7 @@ from foundry_cli.common.session_manager import (
 
 
 def _state(**overrides: object) -> SessionState:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     values = {
         "session_id": "session-rid",
         "agent_rid": "agent-rid",
@@ -56,7 +56,9 @@ def test_alias_normalization_is_stable(raw: str, canonical: str) -> None:
     "alias",
     [".", "..", "../escape", r"..\escape", "CON", "name/child", "é", "a" * 65],
 )
-def test_aliases_that_can_escape_or_confuse_filesystems_are_rejected(alias: str) -> None:
+def test_aliases_that_can_escape_or_confuse_filesystems_are_rejected(
+    alias: str,
+) -> None:
     with pytest.raises(InvalidSessionAliasError):
         SessionManager.normalize_alias(alias)
 
@@ -77,7 +79,9 @@ async def test_create_persists_remote_rid_and_null_token(tmp_path: Path) -> None
 
 
 @pytest.mark.parametrize("token_marker", ["missing", None, "legacy-secret"])
-def test_load_accepts_compatible_token_forms(tmp_path: Path, token_marker: object) -> None:
+def test_load_accepts_compatible_token_forms(
+    tmp_path: Path, token_marker: object
+) -> None:
     manager = SessionManager(tmp_path)
     record = _state(session_token=None).to_dict()
     if token_marker == "missing":
@@ -216,9 +220,11 @@ def test_corrupt_record_is_deleted_without_logging_secret(
     assert all(secret not in repr(record.__dict__) for record in caplog.records)
 
 
-def test_cleanup_expired_uses_utc_boundary_and_purge_is_idempotent(tmp_path: Path) -> None:
+def test_cleanup_expired_uses_utc_boundary_and_purge_is_idempotent(
+    tmp_path: Path,
+) -> None:
     manager = SessionManager(tmp_path, expiry_days=7)
-    now = datetime(2026, 7, 27, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 27, tzinfo=UTC)
     expired = _state(
         session_id="expired",
         last_used_at=(now - timedelta(days=7)).isoformat(),
