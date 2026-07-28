@@ -101,12 +101,12 @@ class PaginationHelper:
         list
             List of items from the response.
         """
+        if isinstance(response, dict):
+            return response.get("items", []) or []
         if isinstance(response, list):
             return response
         if hasattr(response, "items"):
             return getattr(response, "items", []) or []
-        if isinstance(response, dict):
-            return response.get("items", []) or []
         return [response] if response else []
 
     def _extract_next_token(self, response: Any) -> Optional[str]:
