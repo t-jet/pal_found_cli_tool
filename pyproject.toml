@@ -6,10 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "foundry-cli"
 version = "0.1.0"
 description = "Foundry CLI - 33 operations across 5 resource clients"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "foundry-platform-python>=2.0.0",
+    "foundry-platform-sdk>=1.0.0",
     "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +41,9 @@ mypy_path = "src"
 check_untyped_defs = true
 warn_return_any = true
 warn_unused_configs = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["E402", "E741", "F401", "F841"]
 
 [tool.coverage.run]
 source = ["foundry_cli"]
