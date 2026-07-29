@@ -584,7 +584,9 @@ async def main() -> int:
             return EXIT_RATE_LIMIT
         return exit_code
     except Exception as exc:
-        ErrorSerializer().serialize(exc)
+        exit_code = ErrorSerializer().serialize(exc)
+        if exit_code != EXIT_USER_INPUT:
+            return exit_code
         return EXIT_SERVER_ERROR
 
 
@@ -595,4 +597,3 @@ def console_main() -> int:
 
 if __name__ == "__main__":
     sys.exit(console_main())
-
