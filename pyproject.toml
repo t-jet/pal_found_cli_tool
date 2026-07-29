@@ -26,6 +26,7 @@ dev = [
 
 [project.scripts]
 foundry-datasets = "foundry_cli.datasets.scripts.foundry_datasets_cli:main"
+foundry-filesystem = "foundry_cli.filesystem.scripts.foundry_filesystem_cli:console_main"
 foundry-ontologies = "foundry_cli.ontologies.scripts.foundry_ontologies_cli:console_main"
 
 [tool.setuptools.packages.find]
@@ -48,6 +49,7 @@ ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/foundry_cli/ontologies/scripts/*.py" = ["E402"]
+"src/foundry_cli/filesystem/scripts/*.py" = ["E402"]
 "tests/*.py" = ["E402", "E741", "F401", "F841"]
 
 [tool.coverage.run]
@@ -57,6 +59,7 @@ omit = [
     "tests/*",
     "**/__pycache__/*",
     "src/foundry_cli/datasets/scripts/foundry_datasets_cli.py",
+    "src/foundry_cli/filesystem/scripts/foundry_filesystem_cli.py",
     "src/foundry_cli/ontologies/scripts/foundry_ontologies_cli.py",
 ]
 
