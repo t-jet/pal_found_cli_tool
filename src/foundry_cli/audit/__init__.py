@@ -1,0 +1,1 @@
+"""Foundry Audit CLI package."""
