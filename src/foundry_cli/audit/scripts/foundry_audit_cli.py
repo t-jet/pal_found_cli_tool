@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import re
 import sys
@@ -277,9 +278,22 @@ async def _download_content(
 
 def _serialize_error(exception: BaseException) -> int:
     """Serialize an exception and retain the server-error fallback contract."""
-    exit_code = ErrorSerializer().serialize(exception)
+    serializer = ErrorSerializer()
+    exit_code = serializer.serialize(exception, print_to_stdout=False)
     if exit_code == EXIT_USER_INPUT and not isinstance(exception, (TypeError, ValueError)):
-        return EXIT_SERVER_ERROR
+        exit_code = EXIT_SERVER_ERROR
+    envelope = serializer.create_error_envelope(
+        exit_code,
+        str(exception),
+        type(exception).__name__,
+        serializer.call_id,
+    )
+    response = getattr(exception, "response", None)
+    http_status = getattr(response, "status_code", None)
+    if isinstance(http_status, int):
+        envelope["http_status"] = http_status
+    sys.stdout.write(json.dumps(envelope, default=str) + "\n")
+    sys.stdout.flush()
     return exit_code
 
 
