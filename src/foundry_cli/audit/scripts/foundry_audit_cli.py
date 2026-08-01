@@ -12,7 +12,7 @@ import sys
 from collections.abc import Iterable
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT: str | None = None
@@ -55,6 +55,14 @@ logger = logging.getLogger(__name__)
 
 OperationSpec = dict[str, Any]
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
+_METADATA_ALLOWLIST_PATH = Path(__file__).resolve().parents[1] / "metadata-allow-list.md"
+
+
+class _ArgumentParser(argparse.ArgumentParser):
+    """Raise user-input exceptions instead of writing argparse diagnostics."""
+
+    def error(self, message: str) -> NoReturn:
+        raise ValueError(message)
 
 
 def _op(
@@ -100,9 +108,9 @@ OPERATION_BY_RESOURCE: dict[str, dict[str, OperationSpec]] = {
 }
 
 
-def _common_parser(*, paginated: bool) -> argparse.ArgumentParser:
+def _common_parser(*, paginated: bool) -> _ArgumentParser:
     """Build operation-level common options."""
-    parser = argparse.ArgumentParser(add_help=False)
+    parser = _ArgumentParser(add_help=False)
     parser.add_argument("--timeout", type=int, default=None)
     parser.add_argument("--format", choices=("json", "toon", "auto"), default="auto")
     parser.add_argument("--pretty", action="store_true")
@@ -115,7 +123,7 @@ def _common_parser(*, paginated: bool) -> argparse.ArgumentParser:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the parser for the two Foundry Audit operations."""
-    parser = argparse.ArgumentParser(
+    parser = _ArgumentParser(
         prog="foundry_audit_cli",
         description="Foundry Audit CLI - 2 log-file operations",
         epilog="Operations: log-file list; log-file content",
@@ -166,6 +174,13 @@ def _validate_list_cursor(start_date: date | None, page_token: str | None) -> No
     """Require a start date for an initial list request."""
     if start_date is None and not page_token:
         raise ValueError("start_date is required when page_token is not provided")
+
+
+def _validate_timeout(value: int) -> int:
+    """Validate the selected per-attempt timeout from ADR-002."""
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 3600:
+        raise ValueError("timeout must be between 1 and 3600 seconds")
+    return value
 
 
 def _get_client(
@@ -300,10 +315,12 @@ def _serialize_error(exception: BaseException) -> int:
 async def main() -> int:
     """Run the Foundry Audit CLI."""
     parser = build_parser()
-    args = parser.parse_args()
-    if not args.resource or not getattr(args, "operation", None):
-        parser.print_help()
-        return EXIT_USER_INPUT
+    try:
+        args = parser.parse_args()
+        if not args.resource or not getattr(args, "operation", None):
+            raise ValueError("a log-file operation is required")
+    except ValueError as exc:
+        return _serialize_error(exc)
 
     try:
         cfg = ConfigLoader()
@@ -319,14 +336,20 @@ async def main() -> int:
             args.end_date = _parse_iso_date(args.end_date, field="end_date")
             _validate_list_cursor(args.start_date, args.page_token)
 
-        AccessControlGuard(cfg, "AUDIT").check(resource, operation)
+        timeout = _validate_timeout(
+            args.timeout if args.timeout is not None else cfg.timeout_s
+        )
+        AccessControlGuard(
+            cfg,
+            "AUDIT",
+            metadata_allowlist_path=str(_METADATA_ALLOWLIST_PATH),
+        ).check(resource, operation)
 
         factory = AsyncClientFactory()
         helper: PaginationHelper | None = None
         with factory.invocation_scope(cfg):
             client = _get_client(cfg, resource, factory)
-            timeout = args.timeout or cfg.timeout_s
-            retry_handler = RetryHandler()
+            retry_handler = RetryHandler(timeout_s=timeout)
             if operation == "list":
                 result, helper = await retry_handler.execute(
                     _list_log_files, client, args, timeout

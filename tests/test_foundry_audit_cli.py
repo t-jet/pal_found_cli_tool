@@ -181,13 +181,13 @@ def _patch_main_dependencies(
     monkeypatch.setattr(
         foundry_audit_cli,
         "AccessControlGuard",
-        lambda cfg, namespace: selected_guard,
+        lambda cfg, namespace, **kwargs: selected_guard,
     )
     monkeypatch.setattr(foundry_audit_cli, "AsyncClientFactory", lambda: factory)
     monkeypatch.setattr(
         foundry_audit_cli,
         "RetryHandler",
-        lambda: retry or _ImmediateRetry(),
+        lambda **kwargs: retry or _ImmediateRetry(),
     )
     return selected_guard
 
@@ -285,12 +285,50 @@ def test_help_exits_zero_and_names_operations(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("argv", [["prog"], ["prog", "log-file"]])
 async def test_missing_command_returns_one_without_loading_config(
-    monkeypatch: pytest.MonkeyPatch, argv: list[str]
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
 ) -> None:
     loader = MagicMock(side_effect=AssertionError("configuration loaded"))
     monkeypatch.setattr(foundry_audit_cli, "ConfigLoader", loader)
     monkeypatch.setattr(sys, "argv", argv)
     assert await foundry_audit_cli.main() == EXIT_USER_INPUT
+    assert json.loads(capsys.readouterr().out)["exit_code"] == EXIT_USER_INPUT
+    loader.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["prog", "unknown"],
+        ["prog", "log-file", "content", "organization"],
+        [
+            "prog",
+            "log-file",
+            "list",
+            "organization",
+            "--start-date",
+            "2026-08-01",
+            "--page-size",
+            "not-an-int",
+        ],
+    ],
+)
+async def test_argparse_failures_are_json_user_input_errors_on_stdout(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+) -> None:
+    loader = MagicMock(side_effect=AssertionError("configuration loaded"))
+    monkeypatch.setattr(foundry_audit_cli, "ConfigLoader", loader)
+    monkeypatch.setattr(sys, "argv", argv)
+    assert await foundry_audit_cli.main() == EXIT_USER_INPUT
+    captured = capsys.readouterr()
+    envelope = json.loads(captured.out)
+    assert envelope["error"] is True
+    assert envelope["exit_code"] == EXIT_USER_INPUT
+    assert "usage:" not in captured.err
     loader.assert_not_called()
 
 
@@ -321,6 +359,17 @@ def test_initial_list_requires_start_date(token: str | None) -> None:
 
 def test_continuation_token_allows_missing_start_date() -> None:
     foundry_audit_cli._validate_list_cursor(None, "cursor")
+
+
+@pytest.mark.parametrize("value", [1, 30, 3600])
+def test_timeout_accepts_adr_002_bounds(value: int) -> None:
+    assert foundry_audit_cli._validate_timeout(value) == value
+
+
+@pytest.mark.parametrize("value", [0, 3601, -1, True])
+def test_timeout_rejects_values_outside_adr_002_bounds(value: Any) -> None:
+    with pytest.raises(ValueError, match="between 1 and 3600"):
+        foundry_audit_cli._validate_timeout(value)
 
 
 def test_get_client_uses_exact_audit_organization_log_file_route() -> None:
@@ -526,6 +575,22 @@ def test_acl_operation_disable_precedes_namespace_metadata_override(
     guard.check("log_file", "content")
 
 
+def test_packaged_metadata_policy_is_cwd_independent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_METADATA_ONLY", "true")
+    assert foundry_audit_cli._METADATA_ALLOWLIST_PATH.is_file()
+    guard = AccessControlGuard(
+        _Cfg(),
+        "AUDIT",
+        metadata_allowlist_path=str(foundry_audit_cli._METADATA_ALLOWLIST_PATH),
+    )
+    guard.check("log_file", "list")
+    with pytest.raises(AccessControlError):
+        guard.check("log_file", "content")
+
+
 @pytest.mark.asyncio
 async def test_acl_runs_before_factory_construction(monkeypatch: pytest.MonkeyPatch) -> None:
     guard = MagicMock()
@@ -534,7 +599,9 @@ async def test_acl_runs_before_factory_construction(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(foundry_audit_cli, "ConfigLoader", _Cfg)
     monkeypatch.setattr(foundry_audit_cli, "LogSetup", MagicMock())
     monkeypatch.setattr(
-        foundry_audit_cli, "AccessControlGuard", lambda cfg, namespace: guard
+        foundry_audit_cli,
+        "AccessControlGuard",
+        lambda cfg, namespace, **kwargs: guard,
     )
     monkeypatch.setattr(foundry_audit_cli, "AsyncClientFactory", factory_constructor)
     monkeypatch.setattr(
@@ -853,6 +920,77 @@ async def test_main_content_forces_json_and_orders_acl_scope_client_retry(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(("cli_timeout", "config_timeout"), [(17, 42), (None, 42)])
+async def test_main_passes_selected_timeout_to_retry_and_sdk(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    cli_timeout: int | None,
+    config_timeout: int,
+) -> None:
+    class Cfg(_Cfg):
+        timeout_s = config_timeout
+
+    endpoint = _RawListEndpoint({None: _Page([], None)})
+    factory = _Factory(_LogFileClient(raw=endpoint))
+    captured: dict[str, Any] = {}
+
+    def retry_factory(**kwargs: Any) -> _ImmediateRetry:
+        captured.update(kwargs)
+        return _ImmediateRetry()
+
+    _patch_main_dependencies(monkeypatch, factory, cfg_type=Cfg)
+    monkeypatch.setattr(foundry_audit_cli, "RetryHandler", retry_factory)
+    argv = [
+        "prog",
+        "log-file",
+        "list",
+        "organization",
+        "--start-date",
+        "2026-08-01",
+    ]
+    if cli_timeout is not None:
+        argv.extend(["--timeout", str(cli_timeout)])
+    monkeypatch.setattr(sys, "argv", argv)
+    assert await foundry_audit_cli.main() == 0
+    capsys.readouterr()
+    expected = cli_timeout if cli_timeout is not None else config_timeout
+    assert captured == {"timeout_s": expected}
+    assert endpoint.calls[0][1]["request_timeout"] == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("timeout", [0, 3601])
+async def test_main_rejects_timeout_before_acl_or_client(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    timeout: int,
+) -> None:
+    guard_constructor = MagicMock()
+    factory_constructor = MagicMock()
+    monkeypatch.setattr(foundry_audit_cli, "ConfigLoader", _Cfg)
+    monkeypatch.setattr(foundry_audit_cli, "LogSetup", MagicMock())
+    monkeypatch.setattr(foundry_audit_cli, "AccessControlGuard", guard_constructor)
+    monkeypatch.setattr(foundry_audit_cli, "AsyncClientFactory", factory_constructor)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "prog",
+            "log-file",
+            "content",
+            "organization",
+            "file",
+            "--timeout",
+            str(timeout),
+        ],
+    )
+    assert await foundry_audit_cli.main() == EXIT_USER_INPUT
+    assert json.loads(capsys.readouterr().out)["exit_code"] == EXIT_USER_INPUT
+    guard_constructor.assert_not_called()
+    factory_constructor.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_main_invalid_date_stops_before_acl_and_client(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -993,10 +1131,12 @@ async def test_b3_transport_headers_enabled_disabled_retry_stable_and_restored(
     monkeypatch.setattr(foundry_audit_cli, "ConfigLoader", lambda: cfg)
     monkeypatch.setattr(foundry_audit_cli, "LogSetup", MagicMock())
     monkeypatch.setattr(
-        foundry_audit_cli, "AccessControlGuard", lambda cfg, namespace: MagicMock()
+        foundry_audit_cli,
+        "AccessControlGuard",
+        lambda cfg, namespace, **kwargs: MagicMock(),
     )
     monkeypatch.setattr(foundry_audit_cli, "AsyncClientFactory", lambda: factory)
-    monkeypatch.setattr(foundry_audit_cli, "RetryHandler", lambda: retry)
+    monkeypatch.setattr(foundry_audit_cli, "RetryHandler", lambda **kwargs: retry)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -1053,7 +1193,7 @@ async def test_b3_scope_restores_prior_values_after_formatter_failure(
     monkeypatch.setattr(foundry_audit_cli, "OutputFormatter", lambda **kwargs: formatter)
     retry = MagicMock()
     retry.execute = AsyncMock(return_value=([], MagicMock()))
-    monkeypatch.setattr(foundry_audit_cli, "RetryHandler", lambda: retry)
+    monkeypatch.setattr(foundry_audit_cli, "RetryHandler", lambda **kwargs: retry)
     monkeypatch.setattr(
         sys,
         "argv",

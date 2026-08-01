@@ -33,6 +33,9 @@ foundry-audit = "foundry_cli.audit.scripts.foundry_audit_cli:console_main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"foundry_cli.audit" = ["metadata-allow-list.md"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
