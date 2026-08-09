@@ -72,6 +72,10 @@ _WRITE_VERBS = frozenset(
         "promote",
         "pause",
         "unpause",
+        # Streams namespace (DESIGN-016): stream.reset and
+        # subscriber.reset_offsets destroy or rewind stream state and must
+        # stay write-classified.
+        "reset",
     }
 )
 

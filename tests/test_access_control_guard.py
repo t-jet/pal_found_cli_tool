@@ -196,6 +196,17 @@ class TestWriteOperationClassification:
         """
         assert guard._is_write_operation(operation) is True
 
+    @pytest.mark.parametrize("operation", ["reset", "reset_offsets"])
+    def test_streams_reset_verbs_are_writes(self, guard, operation):
+        """Streams reset verbs stay writes (DESIGN-016).
+
+        ``stream.reset`` and ``subscriber.reset_offsets`` mutate stream and
+        subscriber state. They must be classified as writes so READONLY and
+        METADATA_ONLY tiers block them, and narrower overrides cannot
+        downgrade their classification.
+        """
+        assert guard._is_write_operation(operation) is True
+
 
 # ===========================================================================
 # Metadata Operation Classification (AC-4, AC-6)

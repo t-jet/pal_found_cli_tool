@@ -35,6 +35,8 @@ foundry-aip-agents = "foundry_cli.aip_agents.scripts.foundry_aip_agents_cli:cons
 foundry-language-models = "foundry_cli.language_models.scripts.foundry_language_models_cli:console_main"
 foundry-models = "foundry_cli.models.scripts.foundry_models_cli:console_main"
 foundry-orchestration = "foundry_cli.orchestration.scripts.foundry_orchestration_cli:console_main"
+foundry-sql-queries = "foundry_cli.sql_queries.scripts.foundry_sql_queries_cli:console_main"
+foundry-streams = "foundry_cli.streams.scripts.foundry_streams_cli:console_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -45,6 +47,8 @@ where = ["src"]
 "foundry_cli.language_models" = ["metadata-allow-list.md"]
 "foundry_cli.models" = ["metadata-allow-list.md"]
 "foundry_cli.orchestration" = ["metadata-allow-list.md"]
+"foundry_cli.sql_queries" = ["metadata-allow-list.md"]
+"foundry_cli.streams" = ["metadata-allow-list.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -71,6 +75,8 @@ ignore = ["E501"]
 "src/foundry_cli/language_models/scripts/*.py" = ["E402"]
 "src/foundry_cli/models/scripts/*.py" = ["E402"]
 "src/foundry_cli/orchestration/scripts/*.py" = ["E402"]
+"src/foundry_cli/sql_queries/scripts/*.py" = ["E402"]
+"src/foundry_cli/streams/scripts/*.py" = ["E402"]
 "tests/*.py" = ["E402", "E741", "F401", "F841"]
 
 [tool.coverage.run]
