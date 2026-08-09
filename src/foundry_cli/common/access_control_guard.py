@@ -56,6 +56,7 @@ _WRITE_VERBS = frozenset(
         "run",
         "transform",
         "clear",
+        "purge",
         "build",
         "blocking_continue",
         "streaming_continue",

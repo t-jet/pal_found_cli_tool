@@ -29,12 +29,14 @@ foundry-datasets = "foundry_cli.datasets.scripts.foundry_datasets_cli:main"
 foundry-filesystem = "foundry_cli.filesystem.scripts.foundry_filesystem_cli:console_main"
 foundry-ontologies = "foundry_cli.ontologies.scripts.foundry_ontologies_cli:console_main"
 foundry-audit = "foundry_cli.audit.scripts.foundry_audit_cli:console_main"
+foundry-aip-agents = "foundry_cli.aip_agents.scripts.foundry_aip_agents_cli:console_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
 "foundry_cli.audit" = ["metadata-allow-list.md"]
+"foundry_cli.aip_agents" = ["metadata-allow-list.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -56,6 +58,7 @@ ignore = ["E501"]
 "src/foundry_cli/filesystem/scripts/*.py" = ["E402"]
 "tests/*.py" = ["E402", "E741", "F401", "F841"]
 "src/foundry_cli/audit/scripts/*.py" = ["E402"]
+"src/foundry_cli/aip_agents/scripts/*.py" = ["E402"]
 
 [tool.coverage.run]
 source = ["foundry_cli"]

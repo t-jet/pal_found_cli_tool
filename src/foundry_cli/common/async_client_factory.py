@@ -34,7 +34,12 @@ class AsyncClientFactory:
         # instance is independent; ``create()`` never mutates shared state.
         self._last_client: AsyncFoundryClient | None = None
 
-    def create(self, cfg: ConfigLoader) -> "AsyncFoundryClient":
+    def create(
+        self,
+        cfg: ConfigLoader,
+        *,
+        include_attribution: bool | None = None,
+    ) -> "AsyncFoundryClient":
         """Create an ``AsyncFoundryClient`` from credentials in ``cfg``.
 
         Validates token and hostname are present before constructing the
@@ -45,6 +50,9 @@ class AsyncClientFactory:
         ----------
         cfg : ConfigLoader
             Configuration instance with loaded credentials.
+        include_attribution : bool or None, optional
+            ``False`` clears SDK attribution for this client. ``None`` keeps
+            existing behavior and follows loaded configuration.
 
         Returns
         -------
@@ -84,11 +92,14 @@ class AsyncClientFactory:
 
         # SDK reads attribution from a context variable when sending requests.
         # Always set it here so disabled or empty config clears prior values.
-        rids: list[str] = []
-        if cfg.enable_attribution and cfg.attribution_rids:
-            rids = [r.strip() for r in cfg.attribution_rids.split(",")]
-            rids = [r for r in rids if r]
-        ATTRIBUTION_VAR.set(rids or None)
+        if include_attribution is False:
+            ATTRIBUTION_VAR.set(None)
+        else:
+            rids: list[str] = []
+            if cfg.enable_attribution and cfg.attribution_rids:
+                rids = [r.strip() for r in cfg.attribution_rids.split(",")]
+                rids = [r for r in rids if r]
+            ATTRIBUTION_VAR.set(rids or None)
 
         client: AsyncFoundryClient = AsyncFoundryClient(**client_kwargs)
         self._last_client = client
@@ -99,14 +110,45 @@ class AsyncClientFactory:
         self,
         cfg: ConfigLoader,
         supplied: B3Context | None = None,
+        *,
+        include_attribution: bool | None = None,
     ) -> Iterator[B3Context | None]:
         """Keep one trace context active across client creation and SDK calls.
 
         Callers enter this scope before :meth:`create` and leave it only after
         retry handling and response processing finish.
+
+        When ``include_attribution`` is set, this scope restores the prior SDK
+        attribution context on every exit path.
         """
-        with TracingProvider(config=cfg).scope(supplied) as context:
-            yield context
+        attribution_var: Any = None
+        attribution_token: Any = None
+        if include_attribution is not None:
+            try:
+                from foundry_sdk import ATTRIBUTION_VAR
+            except ImportError as exc:
+                raise ConfigurationError(
+                    "foundry-sdk not installed; run 'pip install foundry-platform-sdk'"
+                ) from exc
+            attribution_var = ATTRIBUTION_VAR
+            if include_attribution:
+                rids = [
+                    rid.strip()
+                    for rid in (cfg.attribution_rids or "").split(",")
+                    if rid.strip()
+                ]
+                attribution_token = attribution_var.set(
+                    rids if cfg.enable_attribution and rids else None
+                )
+            else:
+                attribution_token = attribution_var.set(None)
+
+        try:
+            with TracingProvider(config=cfg).scope(supplied) as context:
+                yield context
+        finally:
+            if attribution_token is not None:
+                attribution_var.reset(attribution_token)
 
     @property
     def last_client(self) -> Optional["AsyncFoundryClient"]:

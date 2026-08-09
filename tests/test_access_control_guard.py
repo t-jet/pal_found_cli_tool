@@ -175,6 +175,10 @@ class TestWriteOperationClassification:
         assert guard._is_write_operation("describe_dataset") is False
         assert guard._is_write_operation("fetch_schema") is False
 
+    def test_purge_is_write(self, guard):
+        """Local purge is classified as a write before filesystem mutation."""
+        assert guard._is_write_operation("purge") is True
+
 
 # ===========================================================================
 # Metadata Operation Classification (AC-4, AC-6)
