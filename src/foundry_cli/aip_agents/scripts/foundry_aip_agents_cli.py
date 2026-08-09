@@ -34,6 +34,7 @@ from foundry_cli.common.log_setup import LogSetup
 from foundry_cli.common.output_formatter import OutputFormatter
 from foundry_cli.common.pagination_helper import PaginationHelper
 from foundry_cli.common.retry import RetryHandler
+from foundry_cli.common.sdk_error_utils import sdk_http_status
 from foundry_cli.common.session_manager import SessionManager, SessionState
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,12 @@ class _ArgumentParser(argparse.ArgumentParser):
 
     def error(self, message: str) -> NoReturn:
         raise ValueError(message)
+
+
+class SDKContractError(Exception):
+    """Raised when an SDK result violates its documented response contract."""
+
+    exit_code = EXIT_SERVER_ERROR
 
 
 def _op(
@@ -477,7 +484,7 @@ async def _invoke_sdk(
         helper = None
     if spec["operation"] == "streaming_continue":
         if not isinstance(result, bytes):
-            raise TypeError("streaming_continue must return bytes")
+            raise SDKContractError("streaming_continue returned an invalid SDK result")
         download = await BinaryDownloadHandler(config=cfg).save(
             _one_bytes_chunk(result),
             original_filename=args.output_filename,
@@ -529,8 +536,7 @@ async def _create_session(
 def _serialize_error(exception: BaseException) -> int:
     """Write one structured failure and return its ADR-001 exit code."""
     serializer = ErrorSerializer()
-    response = getattr(exception, "response", None)
-    status = getattr(response, "status_code", None)
+    status = sdk_http_status(exception)
     declared = getattr(exception, "exit_code", None)
     if isinstance(declared, int) and 1 <= declared <= 9:
         exit_code = declared

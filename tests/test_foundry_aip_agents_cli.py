@@ -18,7 +18,17 @@ from foundry_cli.aip_agents.scripts import foundry_aip_agents_cli as cli
 from foundry_cli.common.access_control_guard import AccessControlError, AccessControlGuard
 from foundry_cli.common import async_client_factory as factory_module
 from foundry_cli.common.async_client_factory import AsyncClientFactory
+from foundry_cli.common.error_serializer import ErrorSerializer
+from foundry_cli.common.retry import RetryHandler
+from foundry_cli.common.sdk_error_utils import sdk_http_status
 from foundry_cli.common.session_manager import SessionManager, SessionState
+from foundry_sdk._errors import (
+    NotFoundError,
+    PermissionDeniedError,
+    RateLimitError,
+    ServiceUnavailable,
+    UnauthorizedError,
+)
 
 
 class _RawResponse:
@@ -350,6 +360,102 @@ def test_unexpected_error_does_not_expose_exception_details(
     assert secret not in output
     assert secret not in caplog.text
     assert json.loads(output)["message"] == "AIP Agents operation failed"
+
+
+@pytest.mark.parametrize(
+    ("exception", "status", "exit_code"),
+    [
+        (UnauthorizedError({}), 401, 2),
+        (PermissionDeniedError({}), 403, 3),
+        (NotFoundError({}), 404, 4),
+        (RateLimitError("rate limited", "test"), 429, 7),
+        (ServiceUnavailable("unavailable", "test"), 503, 6),
+    ],
+)
+def test_actual_sdk_errors_map_to_http_and_adr_codes(
+    exception: Exception, status: int, exit_code: int
+) -> None:
+    assert sdk_http_status(exception) == status
+    assert ErrorSerializer().serialize(exception, print_to_stdout=False) == exit_code
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "exception",
+    [
+        RateLimitError("rate limited", "test"),
+        ServiceUnavailable("unavailable", "test"),
+    ],
+)
+async def test_retry_handles_actual_sdk_qos_errors(exception: Exception) -> None:
+    attempts = 0
+
+    async def operation() -> str:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise exception
+        return "ok"
+
+    handler = RetryHandler(
+        max_retries=2,
+        base_delay=0,
+        jitter=False,
+        timeout_s=None,
+    )
+    assert await handler.execute(operation) == "ok"
+    assert attempts == 3
+
+
+@pytest.mark.asyncio
+async def test_retry_does_not_retry_actual_sdk_auth_error() -> None:
+    attempts = 0
+
+    async def operation() -> None:
+        nonlocal attempts
+        attempts += 1
+        raise UnauthorizedError({})
+
+    handler = RetryHandler(max_retries=2, base_delay=0, jitter=False, timeout_s=None)
+    with pytest.raises(UnauthorizedError):
+        await handler.execute(operation)
+    assert attempts == 1
+
+
+@pytest.mark.asyncio
+async def test_non_bytes_streaming_result_is_server_contract_error(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    client = SimpleNamespace(streaming_continue=AsyncMock(return_value="not-bytes"))
+    args = argparse.Namespace(
+        parameter_inputs={},
+        user_input={},
+        contexts_override=None,
+        message_id=None,
+        session_trace_id=None,
+        output_filename=None,
+    )
+    state = SessionState(
+        "session",
+        "agent",
+        None,
+        "2026-08-09T00:00:00+00:00",
+        "2026-08-09T00:00:00+00:00",
+        "active",
+        [],
+    )
+    cfg = _Cfg(tmp_path)
+    with pytest.raises(cli.SDKContractError) as captured:
+        await cli._invoke_sdk(
+            cli._spec_for("session", "streaming_continue"),
+            client,
+            args,
+            30,
+            cfg,
+            state,
+        )
+    assert cli._serialize_error(captured.value) == 6
+    assert json.loads(capsys.readouterr().out)["exit_code"] == 6
 
 
 @pytest.mark.asyncio

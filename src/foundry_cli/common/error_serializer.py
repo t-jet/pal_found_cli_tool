@@ -29,6 +29,8 @@ from importlib import import_module
 import uuid
 from typing import Any
 
+from foundry_cli.common.sdk_error_utils import sdk_http_status
+
 logger = logging.getLogger(__name__)
 
 # Environment variable controlling traceback inclusion in error envelopes.
@@ -97,8 +99,8 @@ class _SDKNetworkError(Exception):
 def _register_sdk_exceptions() -> dict[type[BaseException], int]:
     """Build an exit-code map that includes real SDK exceptions if available.
 
-    The foundry-platform-python SDK exposes ``PalantirRPCException`` subclasses
-    via ``foundry_platform_python.errors``. When the SDK is importable, those
+    The Foundry SDK exposes ``PalantirRPCException`` subclasses through its
+    error module. When the SDK is importable, those
     real exception types are mapped to ADR-001 exit codes so that
     ``isinstance`` matching in :meth:`ErrorSerializer.serialize` actually fires.
     When the SDK is not installed (e.g. unit tests, lightweight environments),
@@ -156,16 +158,17 @@ def _register_sdk_exceptions() -> dict[type[BaseException], int]:
     # SDK is not importable, HTTP status code classification in
     # `_classify_http_exception` remains the primary mapping path.
     try:
-        _sdk_errors = import_module("foundry_sdk.errors")
+        _sdk_errors = import_module("foundry_sdk._errors")
     except ImportError:
         return mapping
 
     sdk_pairs = [
-        ("AuthenticationError", EXIT_AUTH),
+        ("UnauthorizedError", EXIT_AUTH),
         ("PermissionDeniedError", EXIT_PERMISSION_DENIED),
         ("NotFoundError", EXIT_NOT_FOUND),
         ("ValidationError", EXIT_USER_INPUT),
-        ("RateLimitExceeded", EXIT_RATE_LIMIT),
+        ("RateLimitError", EXIT_RATE_LIMIT),
+        ("ServiceUnavailable", EXIT_SERVER_ERROR),
         ("ServerError", EXIT_SERVER_ERROR),
         ("ConflictError", EXIT_USER_INPUT),
         ("NetworkError", EXIT_CONFIGURATION),
@@ -238,9 +241,7 @@ class ErrorSerializer:
         int or None
             HTTP status code if available, None otherwise.
         """
-        if hasattr(exception, "response") and exception.response is not None:
-            return getattr(exception.response, "status_code", None)
-        return None
+        return sdk_http_status(exception)
 
     def _classify_http_exception(self, exception: BaseException) -> int | None:
         """Classify HTTP exceptions based on status code.
@@ -269,6 +270,8 @@ class ErrorSerializer:
             return EXIT_USER_INPUT  # Conflict treated as user input
         if status == 429:
             return EXIT_RATE_LIMIT
+        if status == 503:
+            return EXIT_SERVER_ERROR
         if status and status >= 500 and status != 503:
             return EXIT_SERVER_ERROR
         return None

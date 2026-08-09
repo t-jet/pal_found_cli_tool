@@ -42,6 +42,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 import requests
 
+from foundry_cli.common.sdk_error_utils import sdk_http_status
+
 if TYPE_CHECKING:
     from foundry_cli.common.tracing_provider import B3Context, TracingProvider
 
@@ -123,20 +125,12 @@ def _is_retryable_http_status(exception: BaseException) -> bool:
     bool
         True if the exception exposes a 429/503 status code.
     """
-    response = getattr(exception, "response", None)
-    if response is None:
-        return False
-    status = getattr(response, "status_code", None)
-    return status in RETRYABLE_HTTP_STATUSES
+    return sdk_http_status(exception) in RETRYABLE_HTTP_STATUSES
 
 
 def _get_http_status(exception: BaseException) -> int | None:
     """Extract an HTTP status code from an exception response, if present."""
-    response = getattr(exception, "response", None)
-    if response is None:
-        return None
-    status = getattr(response, "status_code", None)
-    return status if isinstance(status, int) else None
+    return sdk_http_status(exception)
 
 
 class SignalCancellationError(TimeoutError):
