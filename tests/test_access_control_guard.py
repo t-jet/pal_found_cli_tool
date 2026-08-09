@@ -184,6 +184,18 @@ class TestWriteOperationClassification:
         """Language model inference is classified as a cost-bearing write."""
         assert guard._is_write_operation(operation) is True
 
+    @pytest.mark.parametrize(
+        "operation",
+        ["launch", "promote_version", "pause", "unpause"],
+    )
+    def test_models_and_orchestration_mutations_are_writes(self, guard, operation):
+        """Models and orchestration mutating operations stay writes (DESIGN-013/014).
+
+        ``launch``, ``promote_version``, ``pause``, and ``unpause`` must never
+        inherit read behavior under READONLY/METADATA_ONLY tiers.
+        """
+        assert guard._is_write_operation(operation) is True
+
 
 # ===========================================================================
 # Metadata Operation Classification (AC-4, AC-6)

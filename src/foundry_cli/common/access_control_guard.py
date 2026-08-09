@@ -64,6 +64,14 @@ _WRITE_VERBS = frozenset(
         "rag_context",
         "messages",
         "embeddings",
+        # Mutating/cost-bearing operations introduced by the models and
+        # orchestration namespaces (DESIGN-013/014): these verbs mutate
+        # resources or launch billable work and must never be classified as
+        # reads under READONLY/METADATA_ONLY tiers.
+        "launch",
+        "promote",
+        "pause",
+        "unpause",
     }
 )
 
