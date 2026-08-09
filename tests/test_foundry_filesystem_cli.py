@@ -109,6 +109,27 @@ class _ScopeFactory:
         return self.sdk
 
 
+class _AsyncResourceIteratorDouble:
+    def __init__(self, items, next_page_token=None):
+        self.items = list(items)
+        self.index = 0
+        self._page_iterator = self
+        self._next_page_token = next_page_token
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self.index >= len(self.items):
+            raise StopAsyncIteration
+        item = self.items[self.index]
+        self.index += 1
+        return item
+
+    async def get_next_page_token(self):
+        return self._next_page_token
+
+
 class _HttpError(Exception):
     def __init__(self, status_code):
         super().__init__(f"HTTP {status_code}")
@@ -226,11 +247,11 @@ async def test_invoke_paginated_uses_helper_for_all_paginated_ops(
     resource, operation, args
 ):
     client = MagicMock()
-    method = AsyncMock(
-        side_effect=[
-            {"items": [{"id": 1}], "next_page_token": "next"},
-            {"items": [{"id": 2}]},
-        ]
+    method = MagicMock(
+        return_value=_AsyncResourceIteratorDouble(
+            [{"id": 1}, {"id": 2}, {"id": 3}],
+            next_page_token="next",
+        )
     )
     setattr(client, foundry_filesystem_cli._spec_for(resource, operation)["method"], method)
     helper = foundry_filesystem_cli.PaginationHelper(page_size=1, batch_pages=2)
@@ -240,17 +261,48 @@ async def test_invoke_paginated_uses_helper_for_all_paginated_ops(
     )
 
     assert result == [{"id": 1}, {"id": 2}]
+    method.assert_called_once()
+    assert helper.pages_fetched == 2
+    assert helper.next_page_token == "next"
+    assert method.call_args_list[0].kwargs["page_size"] == 1
+    assert method.call_args.kwargs["request_timeout"] == 3
+
+
+@pytest.mark.asyncio
+async def test_invoke_paginated_falls_back_to_page_envelopes():
+    client = MagicMock()
+    method = AsyncMock(
+        side_effect=[
+            {"items": [{"id": 1}], "next_page_token": "next"},
+            {"items": [{"id": 2}]},
+        ]
+    )
+    client.children = method
+    helper = foundry_filesystem_cli.PaginationHelper(page_size=1, batch_pages=2)
+
+    result = await foundry_filesystem_cli._invoke_paginated(
+        "folder",
+        "children",
+        client,
+        _ns(folder_rid="folder", page_size=1),
+        3,
+        helper,
+    )
+
+    assert result == [{"id": 1}, {"id": 2}]
     assert method.await_count == 2
     assert helper.pages_fetched == 2
-    assert method.call_args_list[0].kwargs["page_size"] == 1
     assert method.call_args_list[1].kwargs["page_token"] == "next"
 
 
 @pytest.mark.asyncio
 async def test_main_paginated_operation_emits_next_page_token(monkeypatch, capsys):
     sdk = MagicMock()
-    sdk.filesystem.Folder.children = AsyncMock(
-        return_value={"items": [{"rid": "one"}], "next_page_token": "next"}
+    sdk.filesystem.Folder.children = MagicMock(
+        return_value=_AsyncResourceIteratorDouble(
+            [{"rid": "one"}],
+            next_page_token="next",
+        )
     )
     factory = _ScopeFactory(sdk)
     monkeypatch.setattr(foundry_filesystem_cli, "ConfigLoader", _Cfg)
