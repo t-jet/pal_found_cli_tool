@@ -41,7 +41,13 @@ class _ArgumentParser(argparse.ArgumentParser):
     """Raise parser failures into the structured error boundary."""
 
     def error(self, message: str) -> NoReturn:
-        raise ValueError(message)
+        raise CLIInputError("Invalid command input")
+
+
+class CLIInputError(ValueError):
+    """A locally generated input error whose message contains no supplied value."""
+
+    exit_code = EXIT_USER_INPUT
 
 
 OP_SPECS: tuple[OperationSpec, ...] = (
@@ -133,13 +139,13 @@ def _spec_for(resource: str, operation: str) -> OperationSpec:
     try:
         return OPERATION_BY_RESOURCE[resource][operation]
     except KeyError as exc:
-        raise ValueError(f"Unknown operation: {resource}.{operation}") from exc
+        raise CLIInputError(f"Unknown operation: {resource}.{operation}") from exc
 
 
 def _required_text(value: Any, *, field: str) -> str:
     """Validate a non-empty string while preserving its original value."""
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{field} must not be empty")
+        raise CLIInputError(f"{field} must not be empty")
     return value
 
 
@@ -147,14 +153,14 @@ def _decode_json(value: str, *, field: str) -> Any:
     try:
         return json.loads(value)
     except json.JSONDecodeError as exc:
-        raise ValueError(f"{field} must contain valid JSON") from exc
+        raise CLIInputError(f"{field} must contain valid JSON") from exc
 
 
 def _parse_json_object(value: str, *, field: str) -> dict[str, Any]:
     """Decode one JSON object."""
     result = _decode_json(value, field=field)
     if not isinstance(result, dict):
-        raise ValueError(f"{field} must be a JSON object")
+        raise CLIInputError(f"{field} must be a JSON object")
     return result
 
 
@@ -162,7 +168,7 @@ def _parse_json_object_list(value: str, *, field: str) -> list[dict[str, Any]]:
     """Decode one JSON array containing only objects."""
     result = _decode_json(value, field=field)
     if not isinstance(result, list) or not all(isinstance(item, dict) for item in result):
-        raise ValueError(f"{field} must be a JSON array of objects")
+        raise CLIInputError(f"{field} must be a JSON array of objects")
     return result
 
 
@@ -170,7 +176,7 @@ def _parse_json_string_list(value: str, *, field: str) -> list[str]:
     """Decode one JSON array containing only strings."""
     result = _decode_json(value, field=field)
     if not isinstance(result, list) or not all(isinstance(item, str) for item in result):
-        raise ValueError(f"{field} must be a JSON array of strings")
+        raise CLIInputError(f"{field} must be a JSON array of strings")
     return result
 
 
@@ -194,7 +200,7 @@ def _validate_inputs(spec: OperationSpec, args: argparse.Namespace) -> None:
 def _validate_timeout(value: int) -> int:
     """Validate the effective ADR-002 timeout."""
     if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 3600:
-        raise ValueError("timeout must be between 1 and 3600 seconds")
+        raise CLIInputError("timeout must be between 1 and 3600 seconds")
     return value
 
 
@@ -265,8 +271,7 @@ def _serialize_error(exception: BaseException) -> int:
         exit_code = EXIT_TIMEOUT
     else:
         exit_code = EXIT_SERVER_ERROR
-    safe = isinstance(exception, (ConfigurationError, TimeoutError, TypeError, ValueError)) or declared in {
-        EXIT_USER_INPUT,
+    safe = isinstance(exception, (CLIInputError, ConfigurationError, TimeoutError)) or declared in {
         EXIT_ACCESS_CONTROL,
         EXIT_CONFIGURATION,
     }
@@ -291,8 +296,8 @@ async def main() -> int:
     try:
         args = parser.parse_args()
         if not args.resource or not getattr(args, "operation", None):
-            raise ValueError("a Language Models operation is required")
-    except ValueError as exc:
+            raise CLIInputError("a Language Models operation is required")
+    except CLIInputError as exc:
         return _serialize_error(exc)
 
     try:

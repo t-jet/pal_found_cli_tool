@@ -20,6 +20,7 @@ from foundry_cli.common.async_client_factory import AsyncClientFactory
 from foundry_cli.language_models.scripts import foundry_language_models_cli as cli
 from foundry_sdk import ATTRIBUTION_VAR
 from foundry_sdk._errors import BadRequestError, ServiceUnavailable, UnauthorizedError
+from foundry_sdk import AsyncFoundryClient, UserTokenAuth
 
 
 class _Scope(AbstractContextManager[None]):
@@ -268,6 +269,45 @@ def test_actual_sdk_errors_use_safe_adr_envelopes(
 def test_model_adapter_preserves_response_content() -> None:
     model = SimpleNamespace(to_dict=lambda: {"content": [{"type": "text", "text": "answer"}], "data": [[1.0]]})
     assert cli._model_to_dict(model)["data"] == [[1.0]]
+
+
+@pytest.mark.asyncio
+async def test_real_sdk_validation_error_does_not_expose_rejected_prompt_value(
+    capsys: pytest.CaptureFixture[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    sentinel = "PROMPT_SYSTEM_TOOL_VECTOR_ATTRIBUTION_SECRET"
+    client = AsyncFoundryClient(
+        auth=UserTokenAuth("test-token"),
+        hostname="https://example.invalid",
+        preview=True,
+    ).language_models.AnthropicModel
+    args = argparse.Namespace(
+        model_id="model",
+        max_tokens=1,
+        messages=[{"role": sentinel, "content": []}],
+        output_config=None,
+        stop_sequences=None,
+        system=None,
+        temperature=None,
+        thinking=None,
+        tool_choice=None,
+        tools=None,
+        top_k=None,
+        top_p=None,
+    )
+    with pytest.raises(ValueError) as captured:
+        await cli._invoke_sdk(cli._spec_for("anthropic_model", "messages"), client, args, 1)
+    assert sentinel in str(captured.value)
+
+    assert cli._serialize_error(captured.value) == 1
+    streams = capsys.readouterr()
+    envelope = json.loads(streams.out)
+    assert envelope["exit_code"] == 1
+    assert envelope["message"] == "Language Models operation failed"
+    assert envelope["traceback"] == ""
+    assert sentinel not in streams.out
+    assert sentinel not in streams.err
+    assert sentinel not in caplog.text
 
 
 @pytest.mark.asyncio
