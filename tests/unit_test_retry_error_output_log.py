@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Unit tests for RetryHandler, ErrorSerializer, OutputFormatter, LogSetup (UNITTEST-002).
 
-Pure unit tests — all external dependencies mocked at the module level.
-Covers main scenarios and edge cases for each component as defined in DEV-STORY-002.
+Pure unit tests with mocked HTTP responses. Native Foundry SDK exception
+coverage lives in the namespace integration suites.
 
 Framework: pytest + pytest-asyncio
 Run: pytest tests/unit_test_retry_error_output_log.py -v --tb=long
@@ -975,8 +975,8 @@ class TestErrorSerializerHTTPClassification:
         code = ser.serialize(exc, print_to_stdout=False)
         assert code == EXIT_SERVER_ERROR
 
-    def test_http_503_not_server_error(self, capsys):
-        """503 should NOT be classified as ServerError (excluded per ADR-001)."""
+    def test_http_503_returns_server_error_after_retry_exhaustion(self, capsys):
+        """An exhausted HTTP 503 maps to the terminal server error code."""
         from foundry_cli.common.error_serializer import (
             EXIT_SERVER_ERROR,
             ErrorSerializer,
@@ -985,8 +985,7 @@ class TestErrorSerializerHTTPClassification:
         ser = ErrorSerializer()
         exc = _mock_http_exception(503)
         code = ser.serialize(exc, print_to_stdout=False)
-        # 503 is excluded from ServerError classification
-        assert code != EXIT_SERVER_ERROR
+        assert code == EXIT_SERVER_ERROR
 
     def test_http_status_in_envelope(self, capsys):
         """HTTP status code included in error envelope."""

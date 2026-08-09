@@ -42,7 +42,10 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 import requests
 
-from foundry_cli.common.sdk_error_utils import sdk_http_status
+from foundry_cli.common.sdk_error_utils import (
+    is_sdk_retryable_transport,
+    sdk_http_status,
+)
 
 if TYPE_CHECKING:
     from foundry_cli.common.tracing_provider import B3Context, TracingProvider
@@ -382,7 +385,9 @@ class RetryHandler:
         if status is not None:
             return status in RETRYABLE_HTTP_STATUSES
 
-        return isinstance(exception, self.retry_on) or isinstance(
+        return is_sdk_retryable_transport(exception) or isinstance(
+            exception, self.retry_on
+        ) or isinstance(
             exception, asyncio.TimeoutError
         )
 

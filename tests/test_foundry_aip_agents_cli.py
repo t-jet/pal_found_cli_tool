@@ -23,10 +23,18 @@ from foundry_cli.common.retry import RetryHandler
 from foundry_cli.common.sdk_error_utils import sdk_http_status
 from foundry_cli.common.session_manager import SessionManager, SessionState
 from foundry_sdk._errors import (
+    ApiNotFoundError,
+    BadRequestError,
+    ConflictError,
+    ConnectionError as SDKConnectionError,
+    EnvironmentNotConfigured,
     NotFoundError,
+    NotAuthenticated,
     PermissionDeniedError,
     RateLimitError,
+    SDKInternalError,
     ServiceUnavailable,
+    TimeoutError as SDKTimeoutError,
     UnauthorizedError,
 )
 
@@ -370,13 +378,26 @@ def test_unexpected_error_does_not_expose_exception_details(
         (NotFoundError({}), 404, 4),
         (RateLimitError("rate limited", "test"), 429, 7),
         (ServiceUnavailable("unavailable", "test"), 503, 6),
+        (ApiNotFoundError("missing API"), None, 4),
+        (BadRequestError({}), None, 1),
+        (ConflictError({}), None, 1),
+        (NotAuthenticated(), None, 2),
+        (EnvironmentNotConfigured("missing environment"), None, 9),
+        (SDKTimeoutError(), None, 5),
+        (SDKConnectionError(), None, 6),
+        (SDKInternalError("internal"), None, 6),
     ],
 )
 def test_actual_sdk_errors_map_to_http_and_adr_codes(
-    exception: Exception, status: int, exit_code: int
+    exception: Exception,
+    status: int | None,
+    exit_code: int,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert sdk_http_status(exception) == status
     assert ErrorSerializer().serialize(exception, print_to_stdout=False) == exit_code
+    assert cli._serialize_error(exception) == exit_code
+    assert json.loads(capsys.readouterr().out)["exit_code"] == exit_code
 
 
 @pytest.mark.asyncio
@@ -385,6 +406,8 @@ def test_actual_sdk_errors_map_to_http_and_adr_codes(
     [
         RateLimitError("rate limited", "test"),
         ServiceUnavailable("unavailable", "test"),
+        SDKTimeoutError(),
+        SDKConnectionError(),
     ],
 )
 async def test_retry_handles_actual_sdk_qos_errors(exception: Exception) -> None:
@@ -420,6 +443,22 @@ async def test_retry_does_not_retry_actual_sdk_auth_error() -> None:
     with pytest.raises(UnauthorizedError):
         await handler.execute(operation)
     assert attempts == 1
+
+
+@pytest.mark.asyncio
+async def test_exhausted_actual_sdk_503_maps_to_server_error() -> None:
+    attempts = 0
+
+    async def operation() -> None:
+        nonlocal attempts
+        attempts += 1
+        raise ServiceUnavailable("unavailable", "test")
+
+    handler = RetryHandler(max_retries=1, base_delay=0, jitter=False, timeout_s=None)
+    with pytest.raises(ServiceUnavailable) as captured:
+        await handler.execute(operation)
+    assert attempts == 2
+    assert ErrorSerializer().serialize(captured.value, print_to_stdout=False) == 6
 
 
 @pytest.mark.asyncio

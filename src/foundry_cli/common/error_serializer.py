@@ -25,11 +25,14 @@ import logging
 import os
 import sys
 import traceback
-from importlib import import_module
 import uuid
 from typing import Any
 
-from foundry_cli.common.sdk_error_utils import sdk_http_status
+from foundry_cli.common.sdk_error_utils import (
+    sdk_exception_exit_code,
+    sdk_exception_exit_map,
+    sdk_http_status,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -154,35 +157,7 @@ def _register_sdk_exceptions() -> dict[type[BaseException], int]:
     if AccessControlError is not None:
         mapping[AccessControlError] = EXIT_ACCESS_CONTROL
 
-    # Attempt to register real SDK exception types. This is best-effort: if the
-    # SDK is not importable, HTTP status code classification in
-    # `_classify_http_exception` remains the primary mapping path.
-    try:
-        _sdk_errors = import_module("foundry_sdk._errors")
-    except ImportError:
-        return mapping
-
-    sdk_pairs = [
-        ("UnauthorizedError", EXIT_AUTH),
-        ("PermissionDeniedError", EXIT_PERMISSION_DENIED),
-        ("NotFoundError", EXIT_NOT_FOUND),
-        ("ValidationError", EXIT_USER_INPUT),
-        ("RateLimitError", EXIT_RATE_LIMIT),
-        ("ServiceUnavailable", EXIT_SERVER_ERROR),
-        ("ServerError", EXIT_SERVER_ERROR),
-        ("ConflictError", EXIT_USER_INPUT),
-        ("NetworkError", EXIT_CONFIGURATION),
-    ]
-    for attr_name, exit_code in sdk_pairs:
-        sdk_exc = getattr(_sdk_errors, attr_name, None)
-        if isinstance(sdk_exc, type) and issubclass(sdk_exc, BaseException):
-            mapping[sdk_exc] = exit_code
-
-    # PalantirRPCException base class itself defaults to general/server error.
-    base = getattr(_sdk_errors, "PalantirRPCException", None)
-    if isinstance(base, type) and issubclass(base, BaseException):
-        mapping.setdefault(base, EXIT_SERVER_ERROR)
-
+    mapping.update(sdk_exception_exit_map())
     return mapping
 
 
@@ -312,6 +287,8 @@ class ErrorSerializer:
                 and declared_exit_code in EXIT_CODE_NAMES
             ):
                 exit_code = declared_exit_code
+            elif (sdk_exit_code := sdk_exception_exit_code(exception)) is not None:
+                exit_code = sdk_exit_code
             # Walk MRO for exception type matching
             else:
                 for klass in type(exception).__mro__:

@@ -34,7 +34,7 @@ from foundry_cli.common.log_setup import LogSetup
 from foundry_cli.common.output_formatter import OutputFormatter
 from foundry_cli.common.pagination_helper import PaginationHelper
 from foundry_cli.common.retry import RetryHandler
-from foundry_cli.common.sdk_error_utils import sdk_http_status
+from foundry_cli.common.sdk_error_utils import sdk_exception_exit_code, sdk_http_status
 from foundry_cli.common.session_manager import SessionManager, SessionState
 
 logger = logging.getLogger(__name__)
@@ -538,6 +538,7 @@ def _serialize_error(exception: BaseException) -> int:
     serializer = ErrorSerializer()
     status = sdk_http_status(exception)
     declared = getattr(exception, "exit_code", None)
+    sdk_exit_code = sdk_exception_exit_code(exception)
     if isinstance(declared, int) and 1 <= declared <= 9:
         exit_code = declared
     elif status == 401:
@@ -550,6 +551,8 @@ def _serialize_error(exception: BaseException) -> int:
         exit_code = EXIT_USER_INPUT
     elif status == 429:
         exit_code = EXIT_RATE_LIMIT
+    elif sdk_exit_code is not None:
+        exit_code = sdk_exit_code
     elif isinstance(exception, ConfigurationError):
         exit_code = EXIT_CONFIGURATION
     elif isinstance(exception, (TypeError, ValueError)):
