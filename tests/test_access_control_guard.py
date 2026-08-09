@@ -226,6 +226,44 @@ class TestMetadataOperationClassification:
 class TestStep1OpEnabled:
     """Step 1: Operation-level ENABLED control."""
 
+    @pytest.mark.parametrize(
+        ("namespace", "resource", "operation"),
+        [
+            ("LANGUAGE_MODELS", "anthropic_model", "messages"),
+            ("LANGUAGE_MODELS", "open_ai_model", "embeddings"),
+            ("DATASETS", "dataset", "get"),
+            ("AUDIT", "log_file", "list"),
+        ],
+    )
+    def test_global_enabled_false_blocks_all_namespaces_with_real_config(
+        self, clean_env, monkeypatch, namespace, resource, operation
+    ):
+        """Global disable blocks every operation through the real config contract."""
+        monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_ENABLED", "false")
+        cfg = ConfigLoader()
+        assert cfg.global_enabled is False
+        guard = AccessControlGuard(cfg, namespace)
+        with pytest.raises(AccessControlError) as captured:
+            guard.check(resource, operation)
+        assert captured.value.exit_code == 8
+        assert captured.value.step == 0
+        assert captured.value.blocked_rule["env_var"] == "FOUNDRY_AGENTIC_CLI_ENABLED"
+
+    def test_narrower_enabled_true_cannot_override_global_false(
+        self, clean_env, monkeypatch, mock_cfg
+    ):
+        """Namespace and operation true values do not bypass global disable."""
+        monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_ENABLED", "false")
+        monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_LANGUAGE_MODELS_ENABLED", "true")
+        monkeypatch.setenv(
+            "FOUNDRY_AGENTIC_CLI_LANGUAGE_MODELS_ANTHROPIC_MODEL_MESSAGES_ENABLED",
+            "true",
+        )
+        guard = AccessControlGuard(mock_cfg, "LANGUAGE_MODELS")
+        with pytest.raises(AccessControlError) as captured:
+            guard.check("anthropic_model", "messages")
+        assert captured.value.step == 0
+
     def test_op_enabled_true_permits(self, clean_env, monkeypatch, guard):
         """ENABLED=true at op level → permit (write allowed, returns None)."""
         monkeypatch.setenv(

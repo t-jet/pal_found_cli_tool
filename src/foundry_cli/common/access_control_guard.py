@@ -2,6 +2,7 @@
 """AccessControlGuard — 8-step precedence model (SRS §4.2, ADR-007).
 
 Implements the access control evaluation order:
+0. Global ENABLED absolute gate
 1. Operation-level ENABLED
 2. Namespace-level ENABLED
 3. Operation-level READONLY override (false = permit write when parent READONLY=true)
@@ -194,6 +195,14 @@ class AccessControlGuard:
             return self._is_true_env(env_val)
         return bool(self.cfg.global_readonly)
 
+    def _get_global_enabled(self) -> bool:
+        """Return false only when global CLI enablement is explicitly disabled."""
+        env_val = os.environ.get("FOUNDRY_AGENTIC_CLI_ENABLED")
+        if env_val is not None:
+            return not self._is_false_env(env_val)
+        configured = getattr(self.cfg, "global_enabled", True)
+        return bool(configured)
+
     def _get_global_metadata_only(self) -> bool:
         env_val = os.environ.get("FOUNDRY_AGENTIC_CLI_METADATA_ONLY")
         if env_val is not None:
@@ -360,6 +369,21 @@ class AccessControlGuard:
                     "value": value,
                     "message": message,
                 },
+            )
+
+        # Global disable is an absolute gate. Narrower true values cannot
+        # re-enable a globally disabled CLI.
+        if not self._get_global_enabled():
+            global_enabled_env = "FOUNDRY_AGENTIC_CLI_ENABLED"
+            global_enabled_val = os.environ.get(global_enabled_env, "false")
+            self._log_decision(
+                "BLOCKED", resource, operation, 0, "Global ENABLED=false"
+            )
+            raise _blocked(
+                "Operation blocked: global ENABLED=false",
+                0,
+                global_enabled_env,
+                global_enabled_val,
             )
 
         # Step 1: Operation-level ENABLED

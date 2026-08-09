@@ -24,6 +24,7 @@ ENV_TOKEN = "FOUNDRY_TOKEN"  # nosec B105 - environment variable name, not a sec
 ENV_HOSTNAME = "FOUNDRY_HOSTNAME"
 ENV_TIMEOUT_S = "FOUNDRY_AGENTIC_CLI_TIMEOUT_S"
 ENV_DEFAULT_FORMAT = "FOUNDRY_AGENTIC_CLI_DEFAULT_FORMAT"
+ENV_ENABLED = "FOUNDRY_AGENTIC_CLI_ENABLED"
 ENV_READONLY = "FOUNDRY_AGENTIC_CLI_READONLY"
 ENV_METADATA_ONLY = "FOUNDRY_AGENTIC_CLI_METADATA_ONLY"
 ENV_ENABLE_ATTRIBUTION = "FOUNDRY_AGENTIC_CLI_ENABLE_ATTRIBUTION"
@@ -301,6 +302,16 @@ class ConfigLoader:
     def global_readonly(self) -> bool:
         """Global READONLY flag."""
         return os.environ.get(ENV_READONLY, "").lower() in _TRUTHY
+
+    @property
+    def global_enabled(self) -> bool:
+        """Global CLI enablement flag, enabled unless explicitly false."""
+        return os.environ.get(ENV_ENABLED, "true").lower() not in (
+            "false",
+            "0",
+            "no",
+            "off",
+        )
 
     @property
     def global_metadata_only(self) -> bool:

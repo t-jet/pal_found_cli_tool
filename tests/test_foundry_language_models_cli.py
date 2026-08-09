@@ -211,6 +211,29 @@ async def test_invalid_json_fails_before_client_creation(
     assert factory.create_calls == 0
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["cmd", "anthropic-model", "messages", "model", "--max-tokens", "1", "--messages-json", "[]"],
+        ["cmd", "open-ai-model", "embeddings", "model", "--input-json", "[]"],
+    ],
+)
+async def test_global_disable_blocks_before_client_creation(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+) -> None:
+    root, *_ = _root()
+    factory = _Factory(root)
+    _patch_main(monkeypatch, factory)
+    monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_ENABLED", "false")
+    monkeypatch.setattr(sys, "argv", argv)
+    assert await cli.main() == 8
+    assert json.loads(capsys.readouterr().out)["exit_code"] == 8
+    assert factory.create_calls == 0
+
+
 @pytest.mark.parametrize("operation", ["messages", "embeddings"])
 def test_acl_blocks_both_inference_writes_in_readonly(
     monkeypatch: pytest.MonkeyPatch, operation: str
