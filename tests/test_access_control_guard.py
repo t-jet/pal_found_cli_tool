@@ -179,6 +179,11 @@ class TestWriteOperationClassification:
         """Local purge is classified as a write before filesystem mutation."""
         assert guard._is_write_operation("purge") is True
 
+    @pytest.mark.parametrize("operation", ["messages", "embeddings"])
+    def test_language_model_inference_is_write(self, guard, operation):
+        """Language model inference is classified as a cost-bearing write."""
+        assert guard._is_write_operation(operation) is True
+
 
 # ===========================================================================
 # Metadata Operation Classification (AC-4, AC-6)

@@ -61,6 +61,8 @@ _WRITE_VERBS = frozenset(
         "blocking_continue",
         "streaming_continue",
         "rag_context",
+        "messages",
+        "embeddings",
     }
 )
 
