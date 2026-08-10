@@ -676,6 +676,48 @@ def test_timeout_accepts_adr_002_bounds() -> None:
             cli._validate_timeout(invalid)
 
 
+def test_limit_accepts_1_to_100_bounds() -> None:
+    assert cli._validate_limit(1) == 1
+    assert cli._validate_limit(100) == 100
+    for invalid in (0, 101, -1, True):
+        with pytest.raises(cli.CLIInputError):
+            cli._validate_limit(invalid)
+
+
+def test_invalid_limit_message_never_echoes_value() -> None:
+    sentinel = "limit-sentinel-999"
+    with pytest.raises(cli.CLIInputError) as captured:
+        cli._validate_limit(999)
+    assert sentinel not in str(captured.value)
+    assert str(captured.value) == "limit must be between 1 and 100"
+
+
+@pytest.mark.asyncio
+async def test_invalid_limit_stops_before_acl_or_client(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, _ = _root()
+    factory = _Factory(root)
+    _patch_main(monkeypatch, factory)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "cmd",
+            "check-report",
+            "get-latest",
+            "ri.data-health.main.check.x",
+            "--limit",
+            "0",
+        ],
+    )
+    assert await cli.main() == 1
+    envelope = json.loads(capsys.readouterr().out)
+    assert envelope["exit_code"] == 1
+    assert envelope["message"] == "limit must be between 1 and 100"
+    assert factory.create_calls == 0
+
+
 @pytest.mark.asyncio
 async def test_invalid_timeout_stops_before_acl_or_client(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

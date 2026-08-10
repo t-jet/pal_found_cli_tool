@@ -276,6 +276,19 @@ def _validate_timeout(value: int) -> int:
     return value
 
 
+def _validate_limit(value: int) -> int:
+    """Validate the ``check_report get_latest`` response bound (1..100).
+
+    The installed SDK exposes ``CheckReportLimit`` as a plain int alias
+    without bounds; the server would otherwise reject out-of-range values
+    with a 400. Validating locally gives an earlier, privacy-safe error
+    (ADR-001 exit 1) before any client is created.
+    """
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 100:
+        raise CLIInputError("limit must be between 1 and 100")
+    return value
+
+
 def _validate_inputs(spec: OperationSpec, args: argparse.Namespace) -> None:
     """Validate scalars and decode JSON arguments before client creation."""
     for name in (*spec["positional"], *spec["required"]):
@@ -286,6 +299,12 @@ def _validate_inputs(spec: OperationSpec, args: argparse.Namespace) -> None:
         value = getattr(args, name, None)
         if value is not None:
             setattr(args, name, _parse_json_object(value, field=name))
+    for name in spec["optional"]:
+        if name not in _INT_ARG_NAMES or name != "limit":
+            continue
+        value = getattr(args, name, None)
+        if value is not None:
+            setattr(args, name, _validate_limit(value))
 
 
 def _model_to_dict(value: Any) -> Any:
