@@ -183,9 +183,9 @@ OP_SPECS: tuple[OperationSpec, ...] = (
         ("Connection", "FileImport"),
         "create",
         ("connection_rid",),
-        required=("dataset_rid", "display_name", "filters", "import_mode"),
+        required=("dataset_rid", "display_name", "file_import_filters", "import_mode"),
         optional=("branch_name", "subfolder"),
-        list_json_args=frozenset({"filters"}),
+        list_json_args=frozenset({"file_import_filters"}),
     ),
     _op(
         "file_import",
@@ -222,9 +222,9 @@ OP_SPECS: tuple[OperationSpec, ...] = (
         ("Connection", "FileImport"),
         "replace",
         ("connection_rid", "file_import_rid"),
-        required=("display_name", "filters", "import_mode"),
+        required=("display_name", "file_import_filters", "import_mode"),
         optional=("subfolder",),
-        list_json_args=frozenset({"filters"}),
+        list_json_args=frozenset({"file_import_filters"}),
     ),
     _op(
         "table_import",
@@ -305,6 +305,11 @@ _INT_ARG_NAMES: frozenset[str] = frozenset({"page_size"})
 # Boolean-typed SDK options registered as store_true flags.
 _BOOLEAN_ARG_NAMES: frozenset[str] = frozenset({"allow_schema_changes"})
 
+# Flag-name overrides: the CLI flag stays stable even when the SDK keyword
+# argument name differs. `file-import create/replace` keep `--filters-json`
+# but dispatch to the SDK's keyword-only `file_import_filters` argument.
+_FLAG_NAME_OVERRIDES: dict[str, str] = {"file_import_filters": "filters"}
+
 
 def _common_parser(*, paginated: bool) -> _ArgumentParser:
     """Build operation-level common options."""
@@ -330,7 +335,8 @@ def _add_kwarg(
 ) -> None:
     """Add one named operation argument."""
     if arg_name in _JSON_ARG_NAMES:
-        flag = "--" + _kebab(arg_name) + "-json"
+        flag_name = _FLAG_NAME_OVERRIDES.get(arg_name, arg_name)
+        flag = "--" + _kebab(flag_name) + "-json"
     elif arg_name in _BOOLEAN_ARG_NAMES:
         flag = "--" + _kebab(arg_name)
         parser.add_argument(flag, action="store_true", default=None, dest=arg_name)

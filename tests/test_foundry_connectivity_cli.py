@@ -505,7 +505,47 @@ async def test_file_import_create_dispatches_with_filters_json(
         "ri.conn",
         dataset_rid="ri.dataset",
         display_name="imp",
-        filters=[{"type": "fileSizeFilter", "gt": 1}],
+        file_import_filters=[{"type": "fileSizeFilter", "gt": 1}],
+        import_mode="SNAPSHOT",
+        request_timeout=30,
+    )
+
+
+@pytest.mark.asyncio
+async def test_file_import_replace_dispatches_with_filters_json(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, calls = _root()
+    calls["file_import_replace"].return_value = SimpleNamespace(
+        to_dict=lambda: {"rid": "ri.fi"}
+    )
+    factory = _Factory(root)
+    _patch_main(monkeypatch, factory)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "cmd",
+            "file-import",
+            "replace",
+            "ri.conn",
+            "ri.fi",
+            "--display-name",
+            "imp",
+            "--filters-json",
+            '[{"type": "fileSizeFilter", "lt": 10}]',
+            "--import-mode",
+            "SNAPSHOT",
+            "--format",
+            "json",
+        ],
+    )
+    assert await cli.main() == 0
+    calls["file_import_replace"].assert_awaited_once_with(
+        "ri.conn",
+        "ri.fi",
+        display_name="imp",
+        file_import_filters=[{"type": "fileSizeFilter", "lt": 10}],
         import_mode="SNAPSHOT",
         request_timeout=30,
     )
