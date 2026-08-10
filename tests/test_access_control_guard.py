@@ -207,6 +207,17 @@ class TestWriteOperationClassification:
         """
         assert guard._is_write_operation(operation) is True
 
+    @pytest.mark.parametrize("operation", ["register", "calculate"])
+    def test_media_sets_verbs_are_writes(self, guard, operation):
+        """Media Sets register/calculate verbs stay writes (DESIGN-018).
+
+        ``media_set.register`` registers a media item into a media set and
+        ``media_set.calculate`` starts a transformation job. Both mutate
+        media-set state or launch billable work and must be classified as
+        writes so READONLY and METADATA_ONLY tiers block them.
+        """
+        assert guard._is_write_operation(operation) is True
+
 
 # ===========================================================================
 # Metadata Operation Classification (AC-4, AC-6)

@@ -76,6 +76,13 @@ _WRITE_VERBS = frozenset(
         # subscriber.reset_offsets destroy or rewind stream state and must
         # stay write-classified.
         "reset",
+        # Media Sets namespace (DESIGN-018): media_set.register registers a
+        # media item into a media set and media_set.calculate starts a
+        # transformation job. Both mutate media-set state or launch billable
+        # work and must never be classified as reads under the
+        # READONLY/METADATA_ONLY tiers.
+        "register",
+        "calculate",
     }
 )
 
