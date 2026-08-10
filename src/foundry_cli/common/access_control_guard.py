@@ -83,6 +83,11 @@ _WRITE_VERBS = frozenset(
         # READONLY/METADATA_ONLY tiers.
         "register",
         "calculate",
+        # Third-Party Applications namespace (DESIGN-021): website.deploy and
+        # website.undeploy mutate deployed Website state and must never be
+        # classified as reads under the READONLY/METADATA_ONLY tiers.
+        "deploy",
+        "undeploy",
     }
 )
 

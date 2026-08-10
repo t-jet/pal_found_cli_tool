@@ -218,6 +218,17 @@ class TestWriteOperationClassification:
         """
         assert guard._is_write_operation(operation) is True
 
+    @pytest.mark.parametrize("operation", ["deploy", "undeploy"])
+    def test_third_party_application_verbs_are_writes(self, guard, operation):
+        """Third-Party Applications deploy/undeploy verbs stay writes (DESIGN-021).
+
+        ``website.deploy`` and ``website.undeploy`` mutate deployed Website
+        state. They must be classified as writes so READONLY and
+        METADATA_ONLY tiers block them, and narrower overrides cannot
+        downgrade their classification.
+        """
+        assert guard._is_write_operation(operation) is True
+
 
 # ===========================================================================
 # Metadata Operation Classification (AC-4, AC-6)

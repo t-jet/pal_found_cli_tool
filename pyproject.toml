@@ -41,6 +41,7 @@ foundry-connectivity = "foundry_cli.connectivity.scripts.foundry_connectivity_cl
 foundry-media-sets = "foundry_cli.media_sets.scripts.foundry_media_sets_cli:console_main"
 foundry-checkpoints = "foundry_cli.checkpoints.scripts.foundry_checkpoints_cli:console_main"
 foundry-data-health = "foundry_cli.data_health.scripts.foundry_data_health_cli:console_main"
+foundry-third-party-applications = "foundry_cli.third_party_applications.scripts.foundry_third_party_applications_cli:console_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -57,6 +58,7 @@ where = ["src"]
 "foundry_cli.media_sets" = ["metadata-allow-list.md"]
 "foundry_cli.checkpoints" = ["metadata-allow-list.md"]
 "foundry_cli.data_health" = ["metadata-allow-list.md"]
+"foundry_cli.third_party_applications" = ["metadata-allow-list.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -89,6 +91,7 @@ ignore = ["E501"]
 "src/foundry_cli/media_sets/scripts/*.py" = ["E402"]
 "src/foundry_cli/checkpoints/scripts/*.py" = ["E402"]
 "src/foundry_cli/data_health/scripts/*.py" = ["E402"]
+"src/foundry_cli/third_party_applications/scripts/*.py" = ["E402"]
 "tests/*.py" = ["E402", "E741", "F401", "F841"]
 
 [tool.coverage.run]
