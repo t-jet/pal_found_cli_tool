@@ -229,6 +229,22 @@ class TestWriteOperationClassification:
         """
         assert guard._is_write_operation(operation) is True
 
+    @pytest.mark.parametrize(
+        "operation",
+        ["enable", "set_widget_set", "set_widget_set_by_id"],
+    )
+    def test_widgets_verbs_are_writes(self, guard, operation):
+        """Widgets enable/set_widget_set verbs stay writes (DESIGN-022).
+
+        ``dev_mode_settings.enable`` is a token-scoped mutating POST and
+        ``dev_mode_settings.set_widget_set_by_id`` mutates dev mode
+        settings. The ``set_widget_set`` prefix covers both set_widget_set
+        and set_widget_set_by_id. ``delete`` and ``publish`` (release.delete,
+        repository.publish) were already classified as writes. All four
+        must be blocked under the READONLY/METADATA_ONLY tiers.
+        """
+        assert guard._is_write_operation(operation) is True
+
 
 # ===========================================================================
 # Metadata Operation Classification (AC-4, AC-6)

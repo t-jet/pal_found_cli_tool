@@ -88,6 +88,14 @@ _WRITE_VERBS = frozenset(
         # classified as reads under the READONLY/METADATA_ONLY tiers.
         "deploy",
         "undeploy",
+        # Widgets namespace (DESIGN-022, corrected 8-op catalog): the final
+        # write set is dev_mode_settings.enable, dev_mode_settings.
+        # set_widget_set_by_id, release.delete, and repository.publish.
+        # ``enable`` is token-scoped but still a mutating POST; ``set_widget_set``
+        # covers both set_widget_set and set_widget_set_by_id via the prefix
+        # match. ``delete`` and ``publish`` were already classified as writes.
+        "enable",
+        "set_widget_set",
     }
 )
 
