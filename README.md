@@ -32,6 +32,9 @@ The project is split into three repositories:
 - [CLI tool](https://github.com/t-jet/pal_found_cli_tool)
 - [skills](https://github.com/t-jet/pal_found_cli_skills)
 
+See the [rename migration guide](.ept/docs/deliverables/development/DEV-037-rename-migration.md)
+when updating existing clones, scripts, or skill installations.
+
 ## Development
 
 Install the project with development dependencies:
