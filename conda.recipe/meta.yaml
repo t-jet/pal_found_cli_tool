@@ -1,0 +1,50 @@
+{% set version = environ.get('GIT_TAG', '0.1.0').lstrip('v') %}
+
+package:
+  name: pal_found_cli
+  version: {{ version }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  noarch: python
+  entry_points:
+    - pal-found-datasets = foundry_cli.datasets.scripts.foundry_datasets_cli:main
+    - pal-found-filesystem = foundry_cli.filesystem.scripts.foundry_filesystem_cli:console_main
+    - pal-found-functions = foundry_cli.functions.scripts.foundry_functions_cli:console_main
+    - pal-found-ontologies = foundry_cli.ontologies.scripts.foundry_ontologies_cli:console_main
+    - pal-found-admin = foundry_cli.admin.scripts.foundry_admin_cli:console_main
+    - pal-found-audit = foundry_cli.audit.scripts.foundry_audit_cli:console_main
+    - pal-found-aip-agents = foundry_cli.aip_agents.scripts.foundry_aip_agents_cli:console_main
+    - pal-found-language-models = foundry_cli.language_models.scripts.foundry_language_models_cli:console_main
+    - pal-found-models = foundry_cli.models.scripts.foundry_models_cli:console_main
+    - pal-found-orchestration = foundry_cli.orchestration.scripts.foundry_orchestration_cli:console_main
+    - pal-found-sql-queries = foundry_cli.sql_queries.scripts.foundry_sql_queries_cli:console_main
+    - pal-found-streams = foundry_cli.streams.scripts.foundry_streams_cli:console_main
+    - pal-found-connectivity = foundry_cli.connectivity.scripts.foundry_connectivity_cli:console_main
+    - pal-found-media-sets = foundry_cli.media_sets.scripts.foundry_media_sets_cli:console_main
+    - pal-found-checkpoints = foundry_cli.checkpoints.scripts.foundry_checkpoints_cli:console_main
+    - pal-found-data-health = foundry_cli.data_health.scripts.foundry_data_health_cli:console_main
+    - pal-found-third-party-applications = foundry_cli.third_party_applications.scripts.foundry_third_party_applications_cli:console_main
+    - pal-found-widgets = foundry_cli.widgets.scripts.foundry_widgets_cli:console_main
+  script: {{ PYTHON }} -m pip install . --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.11
+    - pip
+    - setuptools >=68
+    - setuptools-scm >=8
+    - wheel
+  run:
+    - python >=3.11
+    - foundry-platform-sdk >=1.0
+    - python-dotenv >=1.0
+    - requests >=2.31
+
+about:
+  home: https://github.com/t-jet/pal_found_cli_tool
+  license: MIT
+  summary: Command-line access to Palantir Foundry resource operations

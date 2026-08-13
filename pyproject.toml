@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=68.0", "setuptools-scm>=8.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "foundry-cli"
-version = "0.1.0"
+name = "pal_found_cli"
+dynamic = ["version"]
 description = "Foundry CLI - 33 operations across 5 resource clients"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -25,6 +25,26 @@ dev = [
 ]
 
 [project.scripts]
+# The pal-found-* names are the public interface. Legacy names remain as
+# compatibility aliases until the package rename migration is complete.
+pal-found-datasets = "foundry_cli.datasets.scripts.foundry_datasets_cli:main"
+pal-found-filesystem = "foundry_cli.filesystem.scripts.foundry_filesystem_cli:console_main"
+pal-found-functions = "foundry_cli.functions.scripts.foundry_functions_cli:console_main"
+pal-found-ontologies = "foundry_cli.ontologies.scripts.foundry_ontologies_cli:console_main"
+pal-found-admin = "foundry_cli.admin.scripts.foundry_admin_cli:console_main"
+pal-found-audit = "foundry_cli.audit.scripts.foundry_audit_cli:console_main"
+pal-found-aip-agents = "foundry_cli.aip_agents.scripts.foundry_aip_agents_cli:console_main"
+pal-found-language-models = "foundry_cli.language_models.scripts.foundry_language_models_cli:console_main"
+pal-found-models = "foundry_cli.models.scripts.foundry_models_cli:console_main"
+pal-found-orchestration = "foundry_cli.orchestration.scripts.foundry_orchestration_cli:console_main"
+pal-found-sql-queries = "foundry_cli.sql_queries.scripts.foundry_sql_queries_cli:console_main"
+pal-found-streams = "foundry_cli.streams.scripts.foundry_streams_cli:console_main"
+pal-found-connectivity = "foundry_cli.connectivity.scripts.foundry_connectivity_cli:console_main"
+pal-found-media-sets = "foundry_cli.media_sets.scripts.foundry_media_sets_cli:console_main"
+pal-found-checkpoints = "foundry_cli.checkpoints.scripts.foundry_checkpoints_cli:console_main"
+pal-found-data-health = "foundry_cli.data_health.scripts.foundry_data_health_cli:console_main"
+pal-found-third-party-applications = "foundry_cli.third_party_applications.scripts.foundry_third_party_applications_cli:console_main"
+pal-found-widgets = "foundry_cli.widgets.scripts.foundry_widgets_cli:console_main"
 foundry-datasets = "foundry_cli.datasets.scripts.foundry_datasets_cli:main"
 foundry-filesystem = "foundry_cli.filesystem.scripts.foundry_filesystem_cli:console_main"
 foundry-functions = "foundry_cli.functions.scripts.foundry_functions_cli:console_main"
@@ -46,6 +66,10 @@ foundry-widgets = "foundry_cli.widgets.scripts.foundry_widgets_cli:console_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools_scm]
+fallback_version = "0.1.0"
+version_file = "src/foundry_cli/_version.py"
 
 [tool.setuptools.package-data]
 "foundry_cli.audit" = ["metadata-allow-list.md"]
