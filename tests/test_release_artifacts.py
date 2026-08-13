@@ -8,7 +8,7 @@ def test_public_distribution_metadata_and_commands_are_present():
     text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert 'name = "pal_found_cli"' in text
     assert "dynamic = [\"version\"]" in text
-    assert 'version_file = "src/foundry_cli/_version.py"' in text
+    assert 'version_file = "src/pal_found_cli/_version.py"' in text
     assert "pal-found-datasets" in text
 
 
@@ -36,6 +36,6 @@ def test_conda_recipe_aligns_name_and_tag_version():
 
 
 def test_skills_distribution_readme_has_clone_copy_update_flow():
-    text = (ROOT / "foundry_cli_skills" / "README.md").read_text(encoding="utf-8")
+    text = (ROOT / "pal_found_cli_skills" / "README.md").read_text(encoding="utf-8")
     for marker in ("git clone", ".agents/skills", "Claude Code", "## Update"):
         assert marker in text

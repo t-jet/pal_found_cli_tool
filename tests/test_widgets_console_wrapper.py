@@ -7,16 +7,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-from foundry_cli.widgets.scripts import foundry_widgets_cli as packaged
+from pal_found_cli.widgets.scripts import pal_found_widgets_cli as packaged
 
 _ROOT = Path(__file__).parent.parent
 _LAUNCHER = (
     _ROOT
-    / ".claude"
+    / ".agents"
     / "skills"
-    / "foundry-widgets"
+    / "pal-found-widgets"
     / "scripts"
-    / "foundry_widgets_cli.py"
+    / "pal_found_widgets_cli.py"
 )
 
 

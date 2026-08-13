@@ -36,7 +36,7 @@ if str(_SRC_PATH) not in sys.path:
 @pytest.fixture(autouse=True)
 def reset_log_setup():
     """Reset LogSetup singleton before/after each test."""
-    from foundry_cli.common.log_setup import LogSetup
+    from pal_found_cli.common.log_setup import LogSetup
 
     LogSetup.reset()
     yield
@@ -106,7 +106,7 @@ class TestCalculateDelay:
 
     def test_delay_attempt_zero(self):
         """delay at attempt 0 = initial_delay_ms / 1000."""
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         delay = _calculate_delay(
             initial_delay_ms=1000.0,
@@ -119,7 +119,7 @@ class TestCalculateDelay:
 
     def test_delay_attempt_one_doubles(self):
         """delay at attempt 1 = initial_delay_ms * multiplier / 1000."""
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         delay = _calculate_delay(
             initial_delay_ms=1000.0,
@@ -132,7 +132,7 @@ class TestCalculateDelay:
 
     def test_delay_attempt_two_quadruples(self):
         """delay at attempt 2 = initial_delay_ms * multiplier**2 / 1000."""
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         delay = _calculate_delay(
             initial_delay_ms=1000.0,
@@ -145,7 +145,7 @@ class TestCalculateDelay:
 
     def test_delay_capped_at_max_delay(self):
         """delay capped at max_delay_ms regardless of attempt."""
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         delay = _calculate_delay(
             initial_delay_ms=10000.0,
@@ -159,7 +159,7 @@ class TestCalculateDelay:
 
     def test_delay_respects_max_delay_boundary(self):
         """delay exactly at max_delay_ms boundary."""
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         delay = _calculate_delay(
             initial_delay_ms=15000.0,
@@ -173,7 +173,7 @@ class TestCalculateDelay:
 
     def test_jitter_enabled_varies_delay(self):
         """Jitter should produce delay within ±10% of base."""
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         delays = [
             _calculate_delay(
@@ -190,7 +190,7 @@ class TestCalculateDelay:
 
     def test_jitter_disabled_deterministic(self):
         """Without jitter, delay is deterministic."""
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         d1 = _calculate_delay(
             initial_delay_ms=1000.0,
@@ -210,7 +210,7 @@ class TestCalculateDelay:
 
     def test_zero_base_delay(self):
         """Zero initial_delay_ms produces zero delay."""
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         delay = _calculate_delay(
             initial_delay_ms=0.0,
@@ -223,7 +223,7 @@ class TestCalculateDelay:
 
     def test_negative_base_delay_clamped_by_formula(self):
         """Negative initial_delay_ms produces negative delay (edge case)."""
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         delay = _calculate_delay(
             initial_delay_ms=-1.0,
@@ -236,7 +236,7 @@ class TestCalculateDelay:
 
     def test_custom_multiplier(self):
         """Non-2.0 multiplier changes backoff rate."""
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         # multiplier=3.0: 1000 * 3^2 = 9000ms → 9.0s
         delay = _calculate_delay(
@@ -253,27 +253,27 @@ class TestParseBoolEnv:
     """Test _parse_bool_env helper."""
 
     def test_default_when_not_set(self, clean_retry_env):
-        from foundry_cli.common.retry import _parse_bool_env
+        from pal_found_cli.common.retry import _parse_bool_env
 
         result = _parse_bool_env("NONEXISTENT_VAR", True)
         assert result is True
 
     def test_true_values(self, clean_retry_env, monkeypatch):
-        from foundry_cli.common.retry import _parse_bool_env
+        from pal_found_cli.common.retry import _parse_bool_env
 
         for val in ("true", "1", "yes", "on"):
             monkeypatch.setenv("TEST_BOOL", val)
             assert _parse_bool_env("TEST_BOOL", False) is True
 
     def test_false_values(self, clean_retry_env, monkeypatch):
-        from foundry_cli.common.retry import _parse_bool_env
+        from pal_found_cli.common.retry import _parse_bool_env
 
         for val in ("false", "0", "no", "off", "random"):
             monkeypatch.setenv("TEST_BOOL", val)
             assert _parse_bool_env("TEST_BOOL", True) is False
 
     def test_case_insensitive(self, clean_retry_env, monkeypatch):
-        from foundry_cli.common.retry import _parse_bool_env
+        from pal_found_cli.common.retry import _parse_bool_env
 
         monkeypatch.setenv("TEST_BOOL", "TRUE")
         assert _parse_bool_env("TEST_BOOL", False) is True
@@ -288,7 +288,7 @@ class TestRetryHandlerInit:
     """
 
     def test_defaults(self, clean_retry_env):
-        from foundry_cli.common.retry import (
+        from pal_found_cli.common.retry import (
             DEFAULT_INITIAL_DELAY_MS,
             DEFAULT_JITTER,
             DEFAULT_MAX_ATTEMPTS,
@@ -308,7 +308,7 @@ class TestRetryHandlerInit:
         assert handler.max_delay == DEFAULT_MAX_DELAY_MS / 1000.0
 
     def test_explicit_params_override_defaults(self, clean_retry_env):
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(
             max_retries=5,
@@ -324,14 +324,14 @@ class TestRetryHandlerInit:
         assert handler.jitter is False
 
     def test_env_var_max_attempts(self, clean_retry_env, monkeypatch):
-        from foundry_cli.common.retry import ENV_MAX_ATTEMPTS, RetryHandler
+        from pal_found_cli.common.retry import ENV_MAX_ATTEMPTS, RetryHandler
 
         monkeypatch.setenv(ENV_MAX_ATTEMPTS, "7")
         handler = RetryHandler()
         assert handler.max_retries == 7
 
     def test_env_var_initial_delay_ms(self, clean_retry_env, monkeypatch):
-        from foundry_cli.common.retry import ENV_INITIAL_DELAY_MS, RetryHandler
+        from pal_found_cli.common.retry import ENV_INITIAL_DELAY_MS, RetryHandler
 
         monkeypatch.setenv(ENV_INITIAL_DELAY_MS, "5500")
         handler = RetryHandler()
@@ -340,7 +340,7 @@ class TestRetryHandlerInit:
         assert handler.base_delay == 5.5
 
     def test_env_var_max_delay_ms(self, clean_retry_env, monkeypatch):
-        from foundry_cli.common.retry import ENV_MAX_DELAY_MS, RetryHandler
+        from pal_found_cli.common.retry import ENV_MAX_DELAY_MS, RetryHandler
 
         monkeypatch.setenv(ENV_MAX_DELAY_MS, "100000")
         handler = RetryHandler()
@@ -348,14 +348,14 @@ class TestRetryHandlerInit:
         assert handler.max_delay == 100.0
 
     def test_env_var_multiplier(self, clean_retry_env, monkeypatch):
-        from foundry_cli.common.retry import ENV_MULTIPLIER, RetryHandler
+        from pal_found_cli.common.retry import ENV_MULTIPLIER, RetryHandler
 
         monkeypatch.setenv(ENV_MULTIPLIER, "1.5")
         handler = RetryHandler()
         assert handler.multiplier == 1.5
 
     def test_env_var_jitter(self, clean_retry_env, monkeypatch):
-        from foundry_cli.common.retry import ENV_JITTER, RetryHandler
+        from pal_found_cli.common.retry import ENV_JITTER, RetryHandler
 
         monkeypatch.setenv(ENV_JITTER, "false")
         handler = RetryHandler()
@@ -363,26 +363,26 @@ class TestRetryHandlerInit:
 
     def test_explicit_params_override_env(self, clean_retry_env, monkeypatch):
         """Explicit constructor params take precedence over env vars."""
-        from foundry_cli.common.retry import ENV_MAX_ATTEMPTS, RetryHandler
+        from pal_found_cli.common.retry import ENV_MAX_ATTEMPTS, RetryHandler
 
         monkeypatch.setenv(ENV_MAX_ATTEMPTS, "7")
         handler = RetryHandler(max_retries=2)
         assert handler.max_retries == 2
 
     def test_retry_on_default(self, clean_retry_env):
-        from foundry_cli.common.retry import DEFAULT_RETRY_EXCEPTIONS, RetryHandler
+        from pal_found_cli.common.retry import DEFAULT_RETRY_EXCEPTIONS, RetryHandler
 
         handler = RetryHandler()
         assert handler.retry_on == DEFAULT_RETRY_EXCEPTIONS
 
     def test_retry_on_custom(self, clean_retry_env):
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(retry_on=(ValueError, TypeError))
         assert handler.retry_on == (ValueError, TypeError)
 
     def test_repr(self, clean_retry_env):
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(
             max_retries=3,
@@ -403,19 +403,19 @@ class TestRetryHandlerShouldRetry:
     """Test _should_retry method."""
 
     def test_retry_on_matching_exception(self, clean_retry_env):
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(retry_on=(ValueError,))
         assert handler._should_retry(ValueError("test")) is True
 
     def test_no_retry_on_unmatched_exception(self, clean_retry_env):
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(retry_on=(ValueError,))
         assert handler._should_retry(TypeError("test")) is False
 
     def test_retry_on_subclass(self, clean_retry_env):
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         class CustomError(ValueError):
             pass
@@ -430,7 +430,7 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_success_on_first_attempt(self, clean_retry_env):
         """Successful call returns immediately without retry."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=3)
         mock_coro = AsyncMock(return_value="success")
@@ -441,7 +441,7 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_success_after_one_retry(self, clean_retry_env):
         """One failure then success → 2 calls total."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(
             max_retries=3, base_delay=0.0, jitter=False, retry_on=(ValueError,)
@@ -454,7 +454,7 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_retry_exhaustion_raises(self, clean_retry_env):
         """All retries exhausted → raises last exception."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(
             max_retries=2, base_delay=0.0, jitter=False, retry_on=(ValueError,)
@@ -467,7 +467,7 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_non_retryable_exception_no_retry(self, clean_retry_env):
         """Exception not in retry_on → raises immediately."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=3, retry_on=(ValueError,))
         mock_coro = AsyncMock(side_effect=TypeError("not retryable"))
@@ -478,7 +478,7 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_zero_retries_still_one_attempt(self, clean_retry_env):
         """max_retries=0 → one attempt, no retries."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=0, retry_on=(ValueError,))
         mock_coro = AsyncMock(side_effect=ValueError("fail"))
@@ -489,7 +489,7 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_execute_passes_args_kwargs(self, clean_retry_env):
         """execute forwards args and kwargs to the callable."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=0)
         mock_coro = AsyncMock(return_value="ok")
@@ -500,14 +500,14 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_sleep_called_with_delay(self, clean_retry_env):
         """Verify asyncio.sleep is called with calculated delay."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(
             max_retries=1, base_delay=0.5, jitter=False, retry_on=(ValueError,)
         )
         mock_coro = AsyncMock(side_effect=ValueError("fail"))
         with patch(
-            "foundry_cli.common.retry.asyncio.sleep", new_callable=AsyncMock
+            "pal_found_cli.common.retry.asyncio.sleep", new_callable=AsyncMock
         ) as mock_sleep:
             with pytest.raises(ValueError):
                 await handler.execute(mock_coro)
@@ -516,14 +516,14 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_retry_with_different_delays(self, clean_retry_env):
         """Exponential backoff: each retry has different delay."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(
             max_retries=3, base_delay=1.0, jitter=False, retry_on=(ValueError,)
         )
         mock_coro = AsyncMock(side_effect=ValueError("fail"))
         with patch(
-            "foundry_cli.common.retry.asyncio.sleep", new_callable=AsyncMock
+            "pal_found_cli.common.retry.asyncio.sleep", new_callable=AsyncMock
         ) as mock_sleep:
             with pytest.raises(ValueError):
                 await handler.execute(mock_coro)
@@ -533,7 +533,7 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_delay_capped_in_execute(self, clean_retry_env):
         """Delay capped at max_delay during actual execution."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(
             max_retries=3,
@@ -544,7 +544,7 @@ class TestRetryHandlerExecute:
         )
         mock_coro = AsyncMock(side_effect=ValueError("fail"))
         with patch(
-            "foundry_cli.common.retry.asyncio.sleep", new_callable=AsyncMock
+            "pal_found_cli.common.retry.asyncio.sleep", new_callable=AsyncMock
         ) as mock_sleep:
             with pytest.raises(ValueError):
                 await handler.execute(mock_coro)
@@ -558,7 +558,7 @@ class TestRetryHandlerExecute:
         self, clean_retry_env, monkeypatch
     ):
         """BUG-SUB-001: each attempt uses asyncio.wait_for with env timeout."""
-        from foundry_cli.common.retry import ENV_TIMEOUT_S, RetryHandler
+        from pal_found_cli.common.retry import ENV_TIMEOUT_S, RetryHandler
 
         monkeypatch.setenv(ENV_TIMEOUT_S, "0.25")
         handler = RetryHandler(max_retries=0)
@@ -569,7 +569,7 @@ class TestRetryHandlerExecute:
             wait_for_calls.append(timeout)
             return await coro
 
-        with patch("foundry_cli.common.retry.asyncio.wait_for", new=fake_wait_for):
+        with patch("pal_found_cli.common.retry.asyncio.wait_for", new=fake_wait_for):
             result = await handler.execute(mock_coro)
 
         assert result == "success"
@@ -578,7 +578,7 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_timeout_breach_raises_timeout_error(self, clean_retry_env):
         """BUG-SUB-001: timeout breach surfaces as asyncio.TimeoutError."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=0, timeout_s=0.001)
 
@@ -591,7 +591,7 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_http_429_and_503_are_retryable(self, clean_retry_env):
         """BUG-SUB-002: HTTP 429/503 retry even for SDK-style errors."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         for status_code in (429, 503):
             handler = RetryHandler(
@@ -616,7 +616,7 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_http_non_429_503_does_not_retry(self, clean_retry_env):
         """BUG-SUB-002: unrelated HTTP errors do not retry."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(
             max_retries=3,
@@ -634,7 +634,7 @@ class TestRetryHandlerExecute:
     @pytest.mark.asyncio
     async def test_signal_cancellation_maps_to_timeout_error(self, clean_retry_env):
         """BUG-SUB-003: signal-triggered cancellation exits as timeout error."""
-        from foundry_cli.common.retry import RetryHandler, SignalCancellationError
+        from pal_found_cli.common.retry import RetryHandler, SignalCancellationError
 
         handler = RetryHandler(max_retries=3, base_delay=0.0, jitter=False)
 
@@ -648,7 +648,7 @@ class TestRetryHandlerExecute:
                 return lambda: None
 
         with patch(
-            "foundry_cli.common.retry._SignalCancellationScope",
+            "pal_found_cli.common.retry._SignalCancellationScope",
             return_value=FakeSignalScope(),
         ):
             with pytest.raises(SignalCancellationError, match="SIGINT"):
@@ -661,7 +661,7 @@ class TestRetryHandlerDecorator:
     @pytest.mark.asyncio
     async def test_decorator_wraps_function(self, clean_retry_env):
         """Decorator wraps async function and retries on failure."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(
             max_retries=2, base_delay=0.0, jitter=False, retry_on=(ValueError,)
@@ -684,7 +684,7 @@ class TestRetryHandlerDecorator:
     @pytest.mark.asyncio
     async def test_decorator_preserves_name(self, clean_retry_env):
         """@wraps preserves function name."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler()
 
@@ -697,7 +697,7 @@ class TestRetryHandlerDecorator:
     @pytest.mark.asyncio
     async def test_decorator_preserves_docstring(self, clean_retry_env):
         """@wraps preserves docstring."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler()
 
@@ -711,7 +711,7 @@ class TestRetryHandlerDecorator:
     @pytest.mark.asyncio
     async def test_decorator_passes_args(self, clean_retry_env):
         """Decorator forwards args and kwargs."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=0)
 
@@ -729,7 +729,7 @@ class TestRetryHandlerContextManager:
     @pytest.mark.asyncio
     async def test_context_manager_yields_self(self, clean_retry_env):
         """Context manager yields the handler instance."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=0)
         async with handler.context() as ctx:
@@ -738,7 +738,7 @@ class TestRetryHandlerContextManager:
     @pytest.mark.asyncio
     async def test_context_manager_execute(self, clean_retry_env):
         """Can call execute within context manager."""
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=0)
         mock_coro = AsyncMock(return_value="ctx_result")
@@ -756,7 +756,7 @@ class TestErrorSerializerInit:
     """Test ErrorSerializer initialization."""
 
     def test_auto_generates_call_id(self):
-        from foundry_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.error_serializer import ErrorSerializer
 
         ser = ErrorSerializer()
         # UUID format check
@@ -764,7 +764,7 @@ class TestErrorSerializerInit:
         assert ser.call_id[8] == "-"
 
     def test_custom_call_id(self):
-        from foundry_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.error_serializer import ErrorSerializer
 
         ser = ErrorSerializer(call_id="custom-123")
         assert ser.call_id == "custom-123"
@@ -774,7 +774,7 @@ class TestErrorSerializerExitCodeMapping:
     """Test exception-to-exit-code mappings per ADR-001."""
 
     def test_auth_error_exit_code_2(self, capsys):
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_AUTH,
             ErrorSerializer,
             _SDKAuthError,
@@ -785,7 +785,7 @@ class TestErrorSerializerExitCodeMapping:
         assert code == EXIT_AUTH
 
     def test_validation_error_exit_code_1(self, capsys):
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_USER_INPUT,
             ErrorSerializer,
             _SDKValidationError,
@@ -798,21 +798,21 @@ class TestErrorSerializerExitCodeMapping:
         assert code == EXIT_USER_INPUT
 
     def test_value_error_exit_code_1(self, capsys):
-        from foundry_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
 
         ser = ErrorSerializer()
         code = ser.serialize(ValueError("bad value"), print_to_stdout=False)
         assert code == EXIT_USER_INPUT
 
     def test_type_error_exit_code_1(self, capsys):
-        from foundry_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
 
         ser = ErrorSerializer()
         code = ser.serialize(TypeError("wrong type"), print_to_stdout=False)
         assert code == EXIT_USER_INPUT
 
     def test_permission_error_exit_code_3(self, capsys):
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_PERMISSION_DENIED,
             ErrorSerializer,
         )
@@ -822,7 +822,7 @@ class TestErrorSerializerExitCodeMapping:
         assert code == EXIT_PERMISSION_DENIED
 
     def test_not_found_error_exit_code_4(self, capsys):
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_NOT_FOUND,
             ErrorSerializer,
             _SDKNotFoundError,
@@ -833,28 +833,28 @@ class TestErrorSerializerExitCodeMapping:
         assert code == EXIT_NOT_FOUND
 
     def test_file_not_found_exit_code_4(self, capsys):
-        from foundry_cli.common.error_serializer import EXIT_NOT_FOUND, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_NOT_FOUND, ErrorSerializer
 
         ser = ErrorSerializer()
         code = ser.serialize(FileNotFoundError("no file"), print_to_stdout=False)
         assert code == EXIT_NOT_FOUND
 
     def test_timeout_error_exit_code_5(self, capsys):
-        from foundry_cli.common.error_serializer import EXIT_TIMEOUT, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_TIMEOUT, ErrorSerializer
 
         ser = ErrorSerializer()
         code = ser.serialize(TimeoutError("timed out"), print_to_stdout=False)
         assert code == EXIT_TIMEOUT
 
     def test_asyncio_timeout_error_exit_code_5(self, capsys):
-        from foundry_cli.common.error_serializer import EXIT_TIMEOUT, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_TIMEOUT, ErrorSerializer
 
         ser = ErrorSerializer()
         code = ser.serialize(TimeoutError("async timeout"), print_to_stdout=False)
         assert code == EXIT_TIMEOUT
 
     def test_rate_limit_error_exit_code_7(self, capsys):
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_RATE_LIMIT,
             ErrorSerializer,
             _SDKRateLimitError,
@@ -867,7 +867,7 @@ class TestErrorSerializerExitCodeMapping:
         assert code == EXIT_RATE_LIMIT
 
     def test_import_error_exit_code_9(self, capsys):
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_CONFIGURATION,
             ErrorSerializer,
         )
@@ -877,7 +877,7 @@ class TestErrorSerializerExitCodeMapping:
         assert code == EXIT_CONFIGURATION
 
     def test_module_not_found_exit_code_9(self, capsys):
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_CONFIGURATION,
             ErrorSerializer,
         )
@@ -889,7 +889,7 @@ class TestErrorSerializerExitCodeMapping:
         assert code == EXIT_CONFIGURATION
 
     def test_os_error_exit_code_9(self, capsys):
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_CONFIGURATION,
             ErrorSerializer,
         )
@@ -900,7 +900,7 @@ class TestErrorSerializerExitCodeMapping:
 
     def test_unknown_exception_exit_code_1(self, capsys):
         """Unknown exception type → default to exit code 1 (UserInputError)."""
-        from foundry_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
 
         ser = ErrorSerializer()
         code = ser.serialize(Exception("unknown"), print_to_stdout=False)
@@ -911,7 +911,7 @@ class TestErrorSerializerHTTPClassification:
     """Test HTTP status code classification."""
 
     def test_http_401_returns_auth_code(self, capsys):
-        from foundry_cli.common.error_serializer import EXIT_AUTH, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_AUTH, ErrorSerializer
 
         ser = ErrorSerializer()
         exc = _mock_http_exception(401)
@@ -919,7 +919,7 @@ class TestErrorSerializerHTTPClassification:
         assert code == EXIT_AUTH
 
     def test_http_403_returns_permission_denied(self, capsys):
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_PERMISSION_DENIED,
             ErrorSerializer,
         )
@@ -930,7 +930,7 @@ class TestErrorSerializerHTTPClassification:
         assert code == EXIT_PERMISSION_DENIED
 
     def test_http_404_returns_not_found(self, capsys):
-        from foundry_cli.common.error_serializer import EXIT_NOT_FOUND, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_NOT_FOUND, ErrorSerializer
 
         ser = ErrorSerializer()
         exc = _mock_http_exception(404)
@@ -938,7 +938,7 @@ class TestErrorSerializerHTTPClassification:
         assert code == EXIT_NOT_FOUND
 
     def test_http_409_returns_user_input(self, capsys):
-        from foundry_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
 
         ser = ErrorSerializer()
         exc = _mock_http_exception(409)
@@ -946,7 +946,7 @@ class TestErrorSerializerHTTPClassification:
         assert code == EXIT_USER_INPUT
 
     def test_http_429_returns_rate_limit(self, capsys):
-        from foundry_cli.common.error_serializer import EXIT_RATE_LIMIT, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_RATE_LIMIT, ErrorSerializer
 
         ser = ErrorSerializer()
         exc = _mock_http_exception(429)
@@ -954,7 +954,7 @@ class TestErrorSerializerHTTPClassification:
         assert code == EXIT_RATE_LIMIT
 
     def test_http_500_returns_server_error(self, capsys):
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_SERVER_ERROR,
             ErrorSerializer,
         )
@@ -965,7 +965,7 @@ class TestErrorSerializerHTTPClassification:
         assert code == EXIT_SERVER_ERROR
 
     def test_http_502_returns_server_error(self, capsys):
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_SERVER_ERROR,
             ErrorSerializer,
         )
@@ -977,7 +977,7 @@ class TestErrorSerializerHTTPClassification:
 
     def test_http_503_returns_server_error_after_retry_exhaustion(self, capsys):
         """An exhausted HTTP 503 maps to the terminal server error code."""
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_SERVER_ERROR,
             ErrorSerializer,
         )
@@ -989,7 +989,7 @@ class TestErrorSerializerHTTPClassification:
 
     def test_http_status_in_envelope(self, capsys):
         """HTTP status code included in error envelope."""
-        from foundry_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.error_serializer import ErrorSerializer
 
         ser = ErrorSerializer()
         exc = _mock_http_exception(404)
@@ -1003,7 +1003,7 @@ class TestErrorSerializerErrorEnvelope:
     """Test JSON error envelope output."""
 
     def test_error_envelope_structure(self, capsys):
-        from foundry_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.error_serializer import ErrorSerializer
 
         ser = ErrorSerializer(call_id="test-id")
         ser.serialize(ValueError("test error"), print_to_stdout=True)
@@ -1020,7 +1020,7 @@ class TestErrorSerializerErrorEnvelope:
 
     def test_error_envelope_no_stdout(self, capsys):
         """When print_to_stdout=False, nothing written to stdout."""
-        from foundry_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.error_serializer import ErrorSerializer
 
         ser = ErrorSerializer()
         ser.serialize(ValueError("test"), print_to_stdout=False)
@@ -1029,7 +1029,7 @@ class TestErrorSerializerErrorEnvelope:
 
     def test_traceback_included(self, capsys):
         """Traceback string is included in envelope."""
-        from foundry_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.error_serializer import ErrorSerializer
 
         ser = ErrorSerializer()
         ser.serialize(RuntimeError("crash"), print_to_stdout=True)
@@ -1046,7 +1046,7 @@ class TestErrorSerializerStaticMethods:
     """Test static utility methods."""
 
     def test_get_exit_code_name_known(self):
-        from foundry_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.error_serializer import ErrorSerializer
 
         assert ErrorSerializer.get_exit_code_name(0) == "Success"
         assert ErrorSerializer.get_exit_code_name(1) == "UserInputError"
@@ -1055,12 +1055,12 @@ class TestErrorSerializerStaticMethods:
         assert ErrorSerializer.get_exit_code_name(9) == "ConfigurationError"
 
     def test_get_exit_code_name_unknown(self):
-        from foundry_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.error_serializer import ErrorSerializer
 
         assert ErrorSerializer.get_exit_code_name(99) == "UnknownError"
 
     def test_create_error_envelope(self):
-        from foundry_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.error_serializer import ErrorSerializer
 
         envelope = ErrorSerializer.create_error_envelope(
             exit_code=4,
@@ -1076,7 +1076,7 @@ class TestErrorSerializerStaticMethods:
         assert envelope["traceback"] == ""
 
     def test_create_error_envelope_auto_call_id(self):
-        from foundry_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.error_serializer import ErrorSerializer
 
         envelope = ErrorSerializer.create_error_envelope(1, "error")
         assert len(envelope["call_id"]) == 36  # UUID format
@@ -1087,7 +1087,7 @@ class TestErrorSerializerNestedExceptions:
 
     def test_subclass_of_mapped_exception(self, capsys):
         """Custom subclass of mapped base → finds exit code via MRO."""
-        from foundry_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
 
         ser = ErrorSerializer()
 
@@ -1099,7 +1099,7 @@ class TestErrorSerializerNestedExceptions:
 
     def test_deep_subclass(self, capsys):
         """Deeply nested subclass still resolves via MRO."""
-        from foundry_cli.common.error_serializer import EXIT_NOT_FOUND, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_NOT_FOUND, ErrorSerializer
 
         ser = ErrorSerializer()
 
@@ -1114,7 +1114,7 @@ class TestErrorSerializerNestedExceptions:
 
     def test_http_status_takes_precedence_over_type(self, capsys):
         """HTTP status classification takes precedence over exception type matching."""
-        from foundry_cli.common.error_serializer import EXIT_NOT_FOUND, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_NOT_FOUND, ErrorSerializer
 
         ser = ErrorSerializer()
         # ValueError normally → exit code 1, but HTTP 404 → exit code 4
@@ -1134,38 +1134,38 @@ class TestOutputFormatterInit:
     """Test OutputFormatter initialization."""
 
     def test_default_auto_mode(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter()
         assert fmt.format_setting == "auto"
 
     def test_explicit_format_json(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="json")
         assert fmt.format_setting == "json"
 
     def test_explicit_format_toon(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="toon")
         assert fmt.format_setting == "toon"
 
     def test_env_var_format(self, clean_output_env, monkeypatch):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_DEFAULT_FORMAT", "json")
         fmt = OutputFormatter()
         assert fmt.format_setting == "json"
 
     def test_pretty_default_false(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter()
         assert fmt.pretty is False
 
     def test_pretty_true(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(pretty=True)
         assert fmt.pretty is True
@@ -1176,28 +1176,28 @@ class TestOutputFormatterAutoSelection:
 
     def test_step1_explicit_json_wins(self, clean_output_env):
         """Step 1: Explicit format always wins."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="json")
         assert fmt._select_format([{"a": 1}]) == "json"
 
     def test_step1_explicit_toon_wins(self, clean_output_env):
         """Step 1: Explicit TOON even for non-table data."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="toon")
         assert fmt._select_format({"key": "val"}) == "toon"
 
     def test_step2_error_dict_uses_json(self, clean_output_env):
         """Step 2: Error dicts always use JSON."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter()
         assert fmt._select_format({"error": True, "message": "fail"}) == "json"
 
     def test_step3_non_list_uses_json(self, clean_output_env):
         """Step 3: Non-list top-level (dict, scalar) → JSON."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter()
         assert fmt._select_format({"key": "val"}) == "json"
@@ -1207,14 +1207,14 @@ class TestOutputFormatterAutoSelection:
 
     def test_step4_empty_list_uses_json(self, clean_output_env):
         """Step 4: Empty list → JSON."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter()
         assert fmt._select_format([]) == "json"
 
     def test_step5_uniform_dicts_use_toon(self, clean_output_env):
         """Step 5-7: Uniform dict list → TOON."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter()
         data = [{"name": "a", "age": 1}, {"name": "b", "age": 2}]
@@ -1222,7 +1222,7 @@ class TestOutputFormatterAutoSelection:
 
     def test_step6_non_dict_items_use_json(self, clean_output_env):
         """Step 6: List with non-dict items → JSON."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter()
         assert fmt._select_format([{"a": 1}, "string"]) == "json"
@@ -1231,7 +1231,7 @@ class TestOutputFormatterAutoSelection:
 
     def test_step7_mixed_field_sets_use_json(self, clean_output_env):
         """Step 7: Dicts with different keys → JSON."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter()
         data = [{"name": "a"}, {"age": 2}]
@@ -1239,7 +1239,7 @@ class TestOutputFormatterAutoSelection:
 
     def test_step7_superset_field_sets_use_json(self, clean_output_env):
         """Dicts where one has extra fields → JSON."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter()
         data = [{"name": "a", "age": 1}, {"name": "b"}]
@@ -1247,7 +1247,7 @@ class TestOutputFormatterAutoSelection:
 
     def test_single_uniform_dict_list(self, clean_output_env):
         """Single dict in list → TOON (uniform field set of size 1)."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter()
         data = [{"name": "only"}]
@@ -1258,7 +1258,7 @@ class TestOutputFormatterJSON:
     """Test JSON formatting."""
 
     def test_json_compact(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="json")
         result = fmt.format({"key": "value"})
@@ -1266,7 +1266,7 @@ class TestOutputFormatterJSON:
         assert parsed == {"key": "value"}
 
     def test_json_pretty(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="json", pretty=True)
         result = fmt.format({"key": "value"})
@@ -1275,7 +1275,7 @@ class TestOutputFormatterJSON:
         assert "  " in result
 
     def test_json_list_data(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="json")
         data = [{"id": 1}, {"id": 2}]
@@ -1284,20 +1284,20 @@ class TestOutputFormatterJSON:
         assert parsed == [{"id": 1}, {"id": 2}]
 
     def test_json_scalar(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="json")
         assert fmt.format(42) == "42"
         assert fmt.format("hello") == '"hello"'
 
     def test_json_none(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="json")
         assert fmt.format(None) == "null"
 
     def test_json_with_non_serializable(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="json")
         # Using default=str to handle non-serializable
@@ -1310,7 +1310,7 @@ class TestOutputFormatterTOON:
     """Test TOON formatting."""
 
     def test_toon_uniform_data(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="toon")
         data = [{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]
@@ -1320,7 +1320,7 @@ class TestOutputFormatterTOON:
         assert "Bob" in result
 
     def test_toon_with_header_separator(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="toon")
         data = [{"id": 1, "val": "a"}]
@@ -1330,7 +1330,7 @@ class TestOutputFormatterTOON:
         assert "-" in lines[1]  # separator line
 
     def test_toon_empty_list_returns_empty(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="toon")
         result = fmt.format([])
@@ -1338,7 +1338,7 @@ class TestOutputFormatterTOON:
         assert result == "[]"
 
     def test_toon_column_alignment(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="toon")
         data = [
@@ -1353,7 +1353,7 @@ class TestOutputFormatterFormatMethod:
     """Test format() method and edge cases."""
 
     def test_invalid_format_setting_raises(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="invalid")
         with pytest.raises(ValueError, match="Invalid format_setting"):
@@ -1361,14 +1361,14 @@ class TestOutputFormatterFormatMethod:
 
     def test_format_fallback_to_json(self, clean_output_env):
         """When auto selects TOON but data isn't a list of dicts → JSON."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="auto")
         result = fmt.format({"key": "val"})
         assert json.loads(result) == {"key": "val"}
 
     def test_format_error_data(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="auto")
         error = {"error": True, "message": "failed"}
@@ -1377,7 +1377,7 @@ class TestOutputFormatterFormatMethod:
         assert parsed == error
 
     def test_format_large_data(self, clean_output_env):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="json")
         large = [{"id": i, "name": f"item_{i}"} for i in range(1000)]
@@ -1390,7 +1390,7 @@ class TestOutputFormatterEmit:
     """Test emit methods."""
 
     def test_emit_writes_to_stdout(self, clean_output_env, capsys):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="json")
         fmt.emit({"key": "value"})
@@ -1399,7 +1399,7 @@ class TestOutputFormatterEmit:
 
     def test_emit_error_writes_to_stderr(self, clean_output_env, capsys):
         # ADR-004: error output always goes to stderr (not stdout).
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter()
         fmt.emit_error({"error": True, "msg": "fail"})
@@ -1410,7 +1410,7 @@ class TestOutputFormatterEmit:
         assert envelope["error"] is True
 
     def test_emit_to_stderr(self, clean_output_env, capsys):
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter()
         fmt.emit_to_stderr({"meta": "data"})
@@ -1427,7 +1427,7 @@ class TestNdJsonFormatter:
     """Test _NdJsonFormatter directly."""
 
     def test_format_produces_valid_json(self):
-        from foundry_cli.common.log_setup import _NdJsonFormatter
+        from pal_found_cli.common.log_setup import _NdJsonFormatter
 
         formatter = _NdJsonFormatter()
         record = logging.LogRecord(
@@ -1447,7 +1447,7 @@ class TestNdJsonFormatter:
         assert parsed["msg"] == "Hello world"
 
     def test_format_includes_context_fields(self):
-        from foundry_cli.common.log_setup import _NdJsonFormatter
+        from pal_found_cli.common.log_setup import _NdJsonFormatter
 
         formatter = _NdJsonFormatter()
         record = logging.LogRecord(
@@ -1474,7 +1474,7 @@ class TestNdJsonFormatter:
 
     def test_format_skips_none_context(self):
         """Context fields with None value are omitted."""
-        from foundry_cli.common.log_setup import _NdJsonFormatter
+        from pal_found_cli.common.log_setup import _NdJsonFormatter
 
         formatter = _NdJsonFormatter()
         record = logging.LogRecord(
@@ -1492,7 +1492,7 @@ class TestNdJsonFormatter:
         assert "call_id" not in parsed
 
     def test_format_includes_exception_info(self):
-        from foundry_cli.common.log_setup import _NdJsonFormatter
+        from pal_found_cli.common.log_setup import _NdJsonFormatter
 
         formatter = _NdJsonFormatter()
         try:
@@ -1518,7 +1518,7 @@ class TestNdJsonFormatter:
 
     def test_format_timestamp_is_iso8601(self):
         """Timestamp should be ISO 8601 format with timezone."""
-        from foundry_cli.common.log_setup import _NdJsonFormatter
+        from pal_found_cli.common.log_setup import _NdJsonFormatter
 
         formatter = _NdJsonFormatter()
         record = logging.LogRecord(
@@ -1541,27 +1541,27 @@ class TestLogSetupConfigure:
     """Test LogSetup.configure() method."""
 
     def test_configure_returns_root_logger(self, clean_log_env):
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         logger = LogSetup.configure()
         assert logger is logging.getLogger()
 
     def test_configure_sets_default_level_warning(self, clean_log_env):
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         LogSetup.configure()
         root = logging.getLogger()
         assert root.level == logging.WARNING
 
     def test_configure_explicit_level(self, clean_log_env):
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         LogSetup.configure(log_level="DEBUG")
         root = logging.getLogger()
         assert root.level == logging.DEBUG
 
     def test_configure_env_var_level(self, clean_log_env, monkeypatch):
-        from foundry_cli.common.log_setup import ENV_LOG_LEVEL, LogSetup
+        from pal_found_cli.common.log_setup import ENV_LOG_LEVEL, LogSetup
 
         monkeypatch.setenv(ENV_LOG_LEVEL, "ERROR")
         LogSetup.configure()
@@ -1569,7 +1569,7 @@ class TestLogSetupConfigure:
         assert root.level == logging.ERROR
 
     def test_configure_explicit_overrides_env(self, clean_log_env, monkeypatch):
-        from foundry_cli.common.log_setup import ENV_LOG_LEVEL, LogSetup
+        from pal_found_cli.common.log_setup import ENV_LOG_LEVEL, LogSetup
 
         monkeypatch.setenv(ENV_LOG_LEVEL, "ERROR")
         LogSetup.configure(log_level="DEBUG")
@@ -1577,20 +1577,20 @@ class TestLogSetupConfigure:
         assert root.level == logging.DEBUG
 
     def test_configure_invalid_level_raises(self, clean_log_env):
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         with pytest.raises(ValueError, match="Unsupported log level"):
             LogSetup.configure(log_level="INVALID")
 
     def test_configure_case_insensitive_level(self, clean_log_env):
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         LogSetup.configure(log_level="debug")
         root = logging.getLogger()
         assert root.level == logging.DEBUG
 
     def test_configure_all_supported_levels(self, clean_log_env):
-        from foundry_cli.common.log_setup import SUPPORTED_LEVELS, LogSetup
+        from pal_found_cli.common.log_setup import SUPPORTED_LEVELS, LogSetup
 
         for level_name in SUPPORTED_LEVELS:
             LogSetup.reset()
@@ -1601,7 +1601,7 @@ class TestLogSetupConfigure:
             )
 
     def test_configure_adds_stderr_handler(self, clean_log_env):
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         LogSetup.configure()
         root = logging.getLogger()
@@ -1612,7 +1612,7 @@ class TestLogSetupConfigure:
 
     def test_configure_clears_existing_handlers(self, clean_log_env):
         """Existing handlers are cleared before adding new ones."""
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         # Add a dummy handler; pytest may have added LogCaptureHandlers,
         # so we only care that our NullHandler is there before configure.
@@ -1629,7 +1629,7 @@ class TestLogSetupConfigure:
 
     def test_configure_idempotent(self, clean_log_env):
         """Calling configure twice returns existing logger without adding handlers."""
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         LogSetup.configure()
         LogSetup.configure()
@@ -1638,7 +1638,7 @@ class TestLogSetupConfigure:
 
     def test_configure_removes_null_handler(self, clean_log_env):
         """If NullHandler exists (Python 3.8+ behavior), it gets replaced."""
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         LogSetup.configure()
         root = logging.getLogger()
@@ -1650,7 +1650,7 @@ class TestLogSetupReset:
     """Test LogSetup.reset() method."""
 
     def test_reset_clears_handlers(self):
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         LogSetup.configure()
         LogSetup.reset()
@@ -1658,7 +1658,7 @@ class TestLogSetupReset:
         assert len(root.handlers) == 0
 
     def test_reset_allows_reconfigure(self):
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         LogSetup.configure(log_level="DEBUG")
         LogSetup.reset()
@@ -1672,14 +1672,14 @@ class TestLogSetupMetadata:
     """Test metadata separator and emission."""
 
     def test_emit_metadata_separator(self, capsys):
-        from foundry_cli.common.log_setup import METADATA_SEPARATOR, LogSetup
+        from pal_found_cli.common.log_setup import METADATA_SEPARATOR, LogSetup
 
         LogSetup.emit_metadata_separator()
         captured = capsys.readouterr()
         assert captured.err.strip() == METADATA_SEPARATOR
 
     def test_emit_metadata_with_separator(self, capsys):
-        from foundry_cli.common.log_setup import METADATA_SEPARATOR, LogSetup
+        from pal_found_cli.common.log_setup import METADATA_SEPARATOR, LogSetup
 
         meta = {"page": 1, "total": 100}
         LogSetup.emit_metadata(meta)
@@ -1690,7 +1690,7 @@ class TestLogSetupMetadata:
         assert parsed == meta
 
     def test_metadata_separator_value(self):
-        from foundry_cli.common.log_setup import METADATA_SEPARATOR
+        from pal_found_cli.common.log_setup import METADATA_SEPARATOR
 
         assert METADATA_SEPARATOR == "# ---metadata-start---"
 
@@ -1699,14 +1699,14 @@ class TestGetLogger:
     """Test get_logger() convenience function."""
 
     def test_get_logger_returns_named_logger(self, clean_log_env):
-        from foundry_cli.common.log_setup import get_logger
+        from pal_found_cli.common.log_setup import get_logger
 
         logger = get_logger("test.module")
         assert logger.name == "test.module"
 
     def test_get_logger_configures_logging(self, clean_log_env):
         """get_logger should trigger LogSetup.configure()."""
-        from foundry_cli.common.log_setup import LogSetup, get_logger
+        from pal_found_cli.common.log_setup import LogSetup, get_logger
 
         LogSetup.reset()
         logger = get_logger("test")
@@ -1718,7 +1718,7 @@ class TestLogSetupIntegration:
     """Integration-level tests for logging behavior."""
 
     def test_log_record_written_to_stderr(self, clean_log_env, capsys):
-        from foundry_cli.common.log_setup import LogSetup, get_logger
+        from pal_found_cli.common.log_setup import LogSetup, get_logger
 
         LogSetup.configure(log_level="WARNING")
         logger = get_logger("test.integration")
@@ -1731,7 +1731,7 @@ class TestLogSetupIntegration:
         assert parsed["op"] == "test.op"
 
     def test_debug_not_logged_at_warning_level(self, clean_log_env, capsys):
-        from foundry_cli.common.log_setup import LogSetup, get_logger
+        from pal_found_cli.common.log_setup import LogSetup, get_logger
 
         LogSetup.configure(log_level="WARNING")
         logger = get_logger("test.integration")
@@ -1740,7 +1740,7 @@ class TestLogSetupIntegration:
         assert captured.err.strip() == ""
 
     def test_debug_logged_at_debug_level(self, clean_log_env, capsys):
-        from foundry_cli.common.log_setup import LogSetup, get_logger
+        from pal_found_cli.common.log_setup import LogSetup, get_logger
 
         LogSetup.configure(log_level="DEBUG")
         logger = get_logger("test.integration")
@@ -1750,7 +1750,7 @@ class TestLogSetupIntegration:
         assert parsed["msg"] == "should appear"
 
     def test_info_not_logged_at_error_level(self, clean_log_env, capsys):
-        from foundry_cli.common.log_setup import LogSetup, get_logger
+        from pal_found_cli.common.log_setup import LogSetup, get_logger
 
         LogSetup.configure(log_level="ERROR")
         logger = get_logger("test.integration")
@@ -1759,7 +1759,7 @@ class TestLogSetupIntegration:
         assert captured.err.strip() == ""
 
     def test_critical_logged_at_any_level(self, clean_log_env, capsys):
-        from foundry_cli.common.log_setup import LogSetup, get_logger
+        from pal_found_cli.common.log_setup import LogSetup, get_logger
 
         LogSetup.configure(log_level="CRITICAL")
         logger = get_logger("test.integration")
@@ -1778,7 +1778,7 @@ class TestExitCodeConstants:
     """Verify ADR-001 exit code taxonomy constants."""
 
     def test_exit_code_values(self):
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_ACCESS_CONTROL,
             EXIT_AUTH,
             EXIT_CONFIGURATION,
@@ -1803,7 +1803,7 @@ class TestExitCodeConstants:
         assert EXIT_CONFIGURATION == 9
 
     def test_exit_code_names_complete(self):
-        from foundry_cli.common.error_serializer import EXIT_CODE_NAMES
+        from pal_found_cli.common.error_serializer import EXIT_CODE_NAMES
 
         assert len(EXIT_CODE_NAMES) == 10  # codes 0-9
         assert all(i in EXIT_CODE_NAMES for i in range(10))
@@ -1818,7 +1818,7 @@ class TestRetryEnvConstants:
     """Verify retry environment variable constants."""
 
     def test_env_var_names(self):
-        from foundry_cli.common.retry import (
+        from pal_found_cli.common.retry import (
             ENV_MAX_RETRIES,
             ENV_RETRY_BASE_DELAY,
             ENV_RETRY_JITTER,
@@ -1831,7 +1831,7 @@ class TestRetryEnvConstants:
         assert ENV_RETRY_JITTER == "FOUNDRY_RETRY_JITTER"
 
     def test_default_values(self):
-        from foundry_cli.common.retry import (
+        from pal_found_cli.common.retry import (
             DEFAULT_BASE_DELAY,
             DEFAULT_JITTER,
             DEFAULT_MAX_DELAY,

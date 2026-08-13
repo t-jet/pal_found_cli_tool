@@ -12,16 +12,16 @@ from pathlib import Path
 
 import pytest
 
-from foundry_cli.audit.scripts import foundry_audit_cli
+from pal_found_cli.audit.scripts import pal_found_audit_cli
 
 _ROOT = Path(__file__).parent.parent
 _LAUNCHER = (
     _ROOT
-    / ".claude"
+    / ".agents"
     / "skills"
-    / "foundry-audit"
+    / "pal-found-audit"
     / "scripts"
-    / "foundry_audit_cli.py"
+    / "pal_found_audit_cli.py"
 )
 
 
@@ -41,10 +41,10 @@ def _isolated_env() -> dict[str, str]:
 def test_project_registers_exact_foundry_audit_console_entry() -> None:
     with (_ROOT / "pyproject.toml").open("rb") as stream:
         project = tomllib.load(stream)
-    assert project["project"]["scripts"]["foundry-audit"] == (
-        "foundry_cli.audit.scripts.foundry_audit_cli:console_main"
+    assert project["project"]["scripts"]["pal-found-audit"] == (
+        "pal_found_cli.audit.scripts.pal_found_audit_cli:console_main"
     )
-    assert project["tool"]["setuptools"]["package-data"]["foundry_cli.audit"] == [
+    assert project["tool"]["setuptools"]["package-data"]["pal_found_cli.audit"] == [
         "metadata-allow-list.md"
     ]
 
@@ -60,9 +60,9 @@ def test_console_main_uses_one_asyncio_run_boundary(monkeypatch) -> None:
         awaitable.close()
         return 7
 
-    monkeypatch.setattr(foundry_audit_cli, "main", fake_main)
-    monkeypatch.setattr(foundry_audit_cli.asyncio, "run", fake_run)
-    assert foundry_audit_cli.console_main() == 7
+    monkeypatch.setattr(pal_found_audit_cli, "main", fake_main)
+    monkeypatch.setattr(pal_found_audit_cli.asyncio, "run", fake_run)
+    assert pal_found_audit_cli.console_main() == 7
     assert len(calls) == 1
 
 
@@ -72,9 +72,9 @@ def test_claude_launcher_is_thin_and_reexports_packaged_interfaces() -> None:
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    assert module.build_parser is foundry_audit_cli.build_parser
-    assert module.main is foundry_audit_cli.main
-    assert module.console_main is foundry_audit_cli.console_main
+    assert module.build_parser is pal_found_audit_cli.build_parser
+    assert module.main is pal_found_audit_cli.main
+    assert module.console_main is pal_found_audit_cli.console_main
     source = _LAUNCHER.read_text(encoding="utf-8")
     assert "OP_SPECS" not in source
     assert "BinaryDownloadHandler" not in source
@@ -85,8 +85,8 @@ def test_imports_create_no_download_directory_or_network_side_effect(
     tmp_path: Path,
 ) -> None:
     code = (
-        "import foundry_cli.audit; "
-        "import foundry_cli.audit.scripts.foundry_audit_cli; "
+        "import pal_found_cli.audit; "
+        "import pal_found_cli.audit.scripts.pal_found_audit_cli; "
         f"exec(compile(open({str(_LAUNCHER)!r}, encoding='utf-8').read(), "
         f"{str(_LAUNCHER)!r}, 'exec'), "
         f"{{'__name__': 'import_only', '__file__': {str(_LAUNCHER)!r}}})"
@@ -109,7 +109,7 @@ def test_packaged_module_help_returns_zero_and_lists_exact_operations() -> None:
         [
             sys.executable,
             "-m",
-            "foundry_cli.audit.scripts.foundry_audit_cli",
+            "pal_found_cli.audit.scripts.pal_found_audit_cli",
             "--help",
         ],
         cwd=_ROOT,
@@ -182,7 +182,7 @@ def isolated_package_environment(
         check=False,
     )
     assert build.returncode == 0, build.stderr
-    wheels = list(wheel_dir.glob("foundry_cli-*.whl"))
+    wheels = list(wheel_dir.glob("pal_found_cli-*.whl"))
     assert len(wheels) == 1
 
     venv = root / "venv"
@@ -197,7 +197,7 @@ def isolated_package_environment(
     )
     assert create_venv.returncode == 0, create_venv.stderr
     python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    console = venv / ("Scripts/foundry-audit.exe" if os.name == "nt" else "bin/foundry-audit")
+    console = venv / ("Scripts/pal-found-audit.exe" if os.name == "nt" else "bin/pal-found-audit")
     arbitrary_cwd = root / "arbitrary-cwd"
     arbitrary_cwd.mkdir()
     return {
@@ -226,9 +226,9 @@ def _assert_installed_audit_smoke(environment: dict[str, Path]) -> None:
 
     policy_code = """
 import os
-from foundry_cli.audit.scripts.foundry_audit_cli import _METADATA_ALLOWLIST_PATH
-from foundry_cli.common.access_control_guard import AccessControlError, AccessControlGuard
-from foundry_cli.common.config_loader import ConfigLoader
+from pal_found_cli.audit.scripts.pal_found_audit_cli import _METADATA_ALLOWLIST_PATH
+from pal_found_cli.common.access_control_guard import AccessControlError, AccessControlGuard
+from pal_found_cli.common.config_loader import ConfigLoader
 assert _METADATA_ALLOWLIST_PATH.is_file()
 os.environ['FOUNDRY_AGENTIC_CLI_METADATA_ONLY'] = 'true'
 guard = AccessControlGuard(
@@ -276,7 +276,7 @@ def test_wheel_and_editable_installs_work_from_arbitrary_cwd_without_pythonpath(
     environment = isolated_package_environment
     with zipfile.ZipFile(environment["wheel"]) as archive:
         assert (
-            "foundry_cli/audit/metadata-allow-list.md" in archive.namelist()
+            "pal_found_cli/audit/metadata-allow-list.md" in archive.namelist()
         )
 
     wheel_install = subprocess.run(

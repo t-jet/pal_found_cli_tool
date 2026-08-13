@@ -31,13 +31,13 @@ _SRC = Path(__file__).parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from foundry_cli.common.access_control_guard import (
+from pal_found_cli.common.access_control_guard import (
     _METADATA_VERBS,
     _WRITE_VERBS,
     AccessControlError,
     AccessControlGuard,
 )
-from foundry_cli.common.config_loader import ConfigLoader
+from pal_found_cli.common.config_loader import ConfigLoader
 
 # ===========================================================================
 # Fixtures

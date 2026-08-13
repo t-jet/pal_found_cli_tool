@@ -7,18 +7,18 @@ import subprocess
 import sys
 from pathlib import Path
 
-from foundry_cli.third_party_applications.scripts import (
-    foundry_third_party_applications_cli as packaged,
+from pal_found_cli.third_party_applications.scripts import (
+    pal_found_third_party_applications_cli as packaged,
 )
 
 _ROOT = Path(__file__).parent.parent
 _LAUNCHER = (
     _ROOT
-    / ".claude"
+    / ".agents"
     / "skills"
-    / "foundry-third-party-applications"
+    / "pal-found-third-party-applications"
     / "scripts"
-    / "foundry_third_party_applications_cli.py"
+    / "pal_found_third_party_applications_cli.py"
 )
 
 

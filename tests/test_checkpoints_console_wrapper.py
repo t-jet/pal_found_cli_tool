@@ -7,16 +7,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-from foundry_cli.checkpoints.scripts import foundry_checkpoints_cli as packaged
+from pal_found_cli.checkpoints.scripts import pal_found_checkpoints_cli as packaged
 
 _ROOT = Path(__file__).parent.parent
 _LAUNCHER = (
     _ROOT
-    / ".claude"
+    / ".agents"
     / "skills"
-    / "foundry-checkpoints"
+    / "pal-found-checkpoints"
     / "scripts"
-    / "foundry_checkpoints_cli.py"
+    / "pal_found_checkpoints_cli.py"
 )
 
 

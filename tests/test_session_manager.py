@@ -18,8 +18,8 @@ SRC = Path(__file__).parents[1] / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-import foundry_cli.common.session_manager as session_module
-from foundry_cli.common.session_manager import (
+import pal_found_cli.common.session_manager as session_module
+from pal_found_cli.common.session_manager import (
     InvalidSessionAliasError,
     SessionAliasConflictError,
     SessionCorruptionError,

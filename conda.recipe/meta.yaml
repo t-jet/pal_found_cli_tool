@@ -11,24 +11,24 @@ build:
   number: 0
   noarch: python
   entry_points:
-    - pal-found-datasets = foundry_cli.datasets.scripts.foundry_datasets_cli:main
-    - pal-found-filesystem = foundry_cli.filesystem.scripts.foundry_filesystem_cli:console_main
-    - pal-found-functions = foundry_cli.functions.scripts.foundry_functions_cli:console_main
-    - pal-found-ontologies = foundry_cli.ontologies.scripts.foundry_ontologies_cli:console_main
-    - pal-found-admin = foundry_cli.admin.scripts.foundry_admin_cli:console_main
-    - pal-found-audit = foundry_cli.audit.scripts.foundry_audit_cli:console_main
-    - pal-found-aip-agents = foundry_cli.aip_agents.scripts.foundry_aip_agents_cli:console_main
-    - pal-found-language-models = foundry_cli.language_models.scripts.foundry_language_models_cli:console_main
-    - pal-found-models = foundry_cli.models.scripts.foundry_models_cli:console_main
-    - pal-found-orchestration = foundry_cli.orchestration.scripts.foundry_orchestration_cli:console_main
-    - pal-found-sql-queries = foundry_cli.sql_queries.scripts.foundry_sql_queries_cli:console_main
-    - pal-found-streams = foundry_cli.streams.scripts.foundry_streams_cli:console_main
-    - pal-found-connectivity = foundry_cli.connectivity.scripts.foundry_connectivity_cli:console_main
-    - pal-found-media-sets = foundry_cli.media_sets.scripts.foundry_media_sets_cli:console_main
-    - pal-found-checkpoints = foundry_cli.checkpoints.scripts.foundry_checkpoints_cli:console_main
-    - pal-found-data-health = foundry_cli.data_health.scripts.foundry_data_health_cli:console_main
-    - pal-found-third-party-applications = foundry_cli.third_party_applications.scripts.foundry_third_party_applications_cli:console_main
-    - pal-found-widgets = foundry_cli.widgets.scripts.foundry_widgets_cli:console_main
+    - pal-found-datasets = pal_found_cli.datasets.scripts.pal_found_datasets_cli:main
+    - pal-found-filesystem = pal_found_cli.filesystem.scripts.pal_found_filesystem_cli:console_main
+    - pal-found-functions = pal_found_cli.functions.scripts.pal_found_functions_cli:console_main
+    - pal-found-ontologies = pal_found_cli.ontologies.scripts.pal_found_ontologies_cli:console_main
+    - pal-found-admin = pal_found_cli.admin.scripts.pal_found_admin_cli:console_main
+    - pal-found-audit = pal_found_cli.audit.scripts.pal_found_audit_cli:console_main
+    - pal-found-aip-agents = pal_found_cli.aip_agents.scripts.pal_found_aip_agents_cli:console_main
+    - pal-found-language-models = pal_found_cli.language_models.scripts.pal_found_language_models_cli:console_main
+    - pal-found-models = pal_found_cli.models.scripts.pal_found_models_cli:console_main
+    - pal-found-orchestration = pal_found_cli.orchestration.scripts.pal_found_orchestration_cli:console_main
+    - pal-found-sql-queries = pal_found_cli.sql_queries.scripts.pal_found_sql_queries_cli:console_main
+    - pal-found-streams = pal_found_cli.streams.scripts.pal_found_streams_cli:console_main
+    - pal-found-connectivity = pal_found_cli.connectivity.scripts.pal_found_connectivity_cli:console_main
+    - pal-found-media-sets = pal_found_cli.media_sets.scripts.pal_found_media_sets_cli:console_main
+    - pal-found-checkpoints = pal_found_cli.checkpoints.scripts.pal_found_checkpoints_cli:console_main
+    - pal-found-data-health = pal_found_cli.data_health.scripts.pal_found_data_health_cli:console_main
+    - pal-found-third-party-applications = pal_found_cli.third_party_applications.scripts.pal_found_third_party_applications_cli:console_main
+    - pal-found-widgets = pal_found_cli.widgets.scripts.pal_found_widgets_cli:console_main
   script: {{ PYTHON }} -m pip install . --no-deps --no-build-isolation
 
 requirements:

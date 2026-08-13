@@ -7,16 +7,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-from foundry_cli.data_health.scripts import foundry_data_health_cli as packaged
+from pal_found_cli.data_health.scripts import pal_found_data_health_cli as packaged
 
 _ROOT = Path(__file__).parent.parent
 _LAUNCHER = (
     _ROOT
-    / ".claude"
+        / ".agents"
     / "skills"
-    / "foundry-data-health"
+    / "pal-found-data-health"
     / "scripts"
-    / "foundry_data_health_cli.py"
+    / "pal_found_data_health_cli.py"
 )
 
 

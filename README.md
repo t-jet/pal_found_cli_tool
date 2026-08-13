@@ -45,7 +45,7 @@ Run the main validation commands:
 ```bash
 ruff check src tests
 mypy src
-pytest tests --cov=foundry_cli --cov-report=term-missing --cov-report=xml
+pytest tests --cov=pal_found_cli --cov-report=term-missing --cov-report=xml
 python -m build
 twine check dist/*
 ```

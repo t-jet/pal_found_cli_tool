@@ -42,7 +42,7 @@ if str(_SRC_PATH) not in sys.path:
 @pytest.fixture(autouse=True)
 def reset_log_setup():
     """Reset LogSetup singleton before/after each test."""
-    from foundry_cli.common.log_setup import LogSetup
+    from pal_found_cli.common.log_setup import LogSetup
 
     LogSetup.reset()
     yield
@@ -124,7 +124,7 @@ class TestRetryHandler_TC:
         When _calculate_delay() is called for attempts 0-4
         Then delays are [1.0, 2.0, 4.0, 8.0, 16.0]
         """
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         expected = [1.0, 2.0, 4.0, 8.0, 16.0]
         for attempt, exp_delay in enumerate(expected):
@@ -146,7 +146,7 @@ class TestRetryHandler_TC:
         When _calculate_delay() is called for attempts 0-5
         Then delays are [1.0, 2.0, 4.0, 5.0, 5.0, 5.0] — capped at 5.0 from attempt 3
         """
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         expected = [1.0, 2.0, 4.0, 5.0, 5.0, 5.0]
         for attempt, exp_delay in enumerate(expected):
@@ -168,7 +168,7 @@ class TestRetryHandler_TC:
         When _calculate_delay() is called 100 times
         Then each delay is within [0.9, 1.1] (+-10% of base_delay)
         """
-        from foundry_cli.common.retry import _calculate_delay
+        from pal_found_cli.common.retry import _calculate_delay
 
         for _ in range(100):
             delay = _calculate_delay(
@@ -189,7 +189,7 @@ class TestRetryHandler_TC:
         When RetryHandler() is instantiated with no constructor arguments
         Then handler reads all values from env vars
         """
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_RETRY_MAX_ATTEMPTS", "5")
         monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_RETRY_INITIAL_DELAY_MS", "2000")
@@ -215,7 +215,7 @@ class TestRetryHandler_TC:
         When @handler decorator is applied and awaited
         Then function succeeds on 3rd attempt and preserves __name__ and __doc__
         """
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         call_count = 0
         handler = RetryHandler(max_retries=2, base_delay=0.001)
@@ -242,7 +242,7 @@ class TestRetryHandler_TC:
         When async with handler.context() as h: and h.execute() is called
         Then context manager yields the RetryHandler instance
         """
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=2, base_delay=0.001)
 
@@ -267,7 +267,7 @@ class TestRetryHandler_TC:
         When handler.execute(always_failing) is called
         Then after 3 total attempts, the last RequestException is raised
         """
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=2, base_delay=0.001)
         last_exc = None
@@ -290,7 +290,7 @@ class TestRetryHandler_TC:
         When handler.execute(failing_func) is called
         Then the function is attempted exactly once and the exception is raised
         """
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=0, base_delay=0.001)
         attempt_count = 0
@@ -318,7 +318,7 @@ class TestErrorSerializer_TC:
 
     def test_TC_ES_001_exit_code_1_user_input_error(self, stdout_capture):
         """TC-ES-001: Exit code 1 — UserInputError (ValueError, TypeError)."""
-        from foundry_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
 
         serializer = ErrorSerializer()
 
@@ -330,7 +330,7 @@ class TestErrorSerializer_TC:
 
     def test_TC_ES_002_exit_code_2_auth_error(self, stdout_capture):
         """TC-ES-002: Exit code 2 — AuthenticationError (HTTP 401)."""
-        from foundry_cli.common.error_serializer import EXIT_AUTH, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_AUTH, ErrorSerializer
 
         serializer = ErrorSerializer()
         exc = _mock_http_exception(401)
@@ -339,7 +339,7 @@ class TestErrorSerializer_TC:
 
     def test_TC_ES_003_exit_code_3_permission_denied(self, stdout_capture):
         """TC-ES-003: Exit code 3 — PermissionDeniedError (PermissionError, HTTP 403)."""
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_PERMISSION_DENIED,
             ErrorSerializer,
         )
@@ -357,7 +357,7 @@ class TestErrorSerializer_TC:
 
     def test_TC_ES_004_exit_code_4_not_found(self, stdout_capture):
         """TC-ES-004: Exit code 4 — NotFoundError (FileNotFoundError, HTTP 404)."""
-        from foundry_cli.common.error_serializer import EXIT_NOT_FOUND, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_NOT_FOUND, ErrorSerializer
 
         serializer = ErrorSerializer()
 
@@ -370,7 +370,7 @@ class TestErrorSerializer_TC:
 
     def test_TC_ES_005_exit_code_5_timeout(self, stdout_capture):
         """TC-ES-005: Exit code 5 — TimeoutError (asyncio.TimeoutError)."""
-        from foundry_cli.common.error_serializer import EXIT_TIMEOUT, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_TIMEOUT, ErrorSerializer
 
         serializer = ErrorSerializer()
 
@@ -382,7 +382,7 @@ class TestErrorSerializer_TC:
 
     def test_TC_ES_006_exit_code_6_server_error(self, stdout_capture):
         """TC-ES-006: Exit code 6 — ServerError (HTTP 500, 502)."""
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_SERVER_ERROR,
             ErrorSerializer,
         )
@@ -399,7 +399,7 @@ class TestErrorSerializer_TC:
 
     def test_TC_ES_007_exit_code_7_rate_limit(self, stdout_capture):
         """TC-ES-007: Exit code 7 — RateLimitExhausted (HTTP 429)."""
-        from foundry_cli.common.error_serializer import EXIT_RATE_LIMIT, ErrorSerializer
+        from pal_found_cli.common.error_serializer import EXIT_RATE_LIMIT, ErrorSerializer
 
         serializer = ErrorSerializer()
         exc429 = _mock_http_exception(429)
@@ -415,8 +415,8 @@ class TestErrorSerializer_TC:
         the stdout error envelope reports type 'AccessControlError' and the
         correct exit_code_name.
         """
-        from foundry_cli.common.access_control_guard import AccessControlError
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.access_control_guard import AccessControlError
+        from pal_found_cli.common.error_serializer import (
             EXIT_ACCESS_CONTROL,
             EXIT_USER_INPUT,
             ErrorSerializer,
@@ -445,8 +445,8 @@ class TestErrorSerializer_TC:
         """
         import io as _io
 
-        from foundry_cli.common.access_control_guard import AccessControlError
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.access_control_guard import AccessControlError
+        from pal_found_cli.common.error_serializer import (
             EXIT_CODE_NAMES,
             ErrorSerializer,
         )
@@ -478,7 +478,7 @@ class TestErrorSerializer_TC:
 
     def test_TC_ES_009_exit_code_9_configuration_error(self, stdout_capture):
         """TC-ES-009: Exit code 9 — ConfigurationError (ImportError, OSError, EnvironmentError)."""
-        from foundry_cli.common.error_serializer import (
+        from pal_found_cli.common.error_serializer import (
             EXIT_CONFIGURATION,
             ErrorSerializer,
         )
@@ -500,7 +500,7 @@ class TestErrorSerializer_TC:
 
     def test_TC_ES_010_error_envelope_schema(self, stdout_capture):
         """TC-ES-010: Error envelope schema and metadata completeness."""
-        from foundry_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.error_serializer import ErrorSerializer
 
         serializer = ErrorSerializer(call_id="test-123")
 
@@ -533,7 +533,7 @@ class TestOutputFormatter_TC:
 
     def test_TC_OF_001_json_format_output(self, clean_output_env):
         """TC-OF-001: JSON format output."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         formatter = OutputFormatter(format_setting="json")
         result = formatter.format({"key": "value", "num": 42})
@@ -542,7 +542,7 @@ class TestOutputFormatter_TC:
 
     def test_TC_OF_002_toon_format_output(self, clean_output_env):
         """TC-OF-002: TOON format output (tabular)."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         data = [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
         formatter = OutputFormatter(format_setting="toon")
@@ -555,7 +555,7 @@ class TestOutputFormatter_TC:
 
     def test_TC_OF_003_auto_selection_explicit_format_wins(self, clean_output_env):
         """TC-OF-003: Auto-selection — explicit format wins (Step 1 of ADR-004)."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         data = [{"id": "1"}, {"id": "2"}]  # Uniform list would select TOON
         formatter = OutputFormatter(format_setting="json")
@@ -566,7 +566,7 @@ class TestOutputFormatter_TC:
 
     def test_TC_OF_004_auto_selection_error_always_json(self, clean_output_env):
         """TC-OF-004: Auto-selection — error data always JSON (Step 2)."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         formatter = OutputFormatter(format_setting="auto")
         error_data = {"error": True, "message": "fail"}
@@ -578,7 +578,7 @@ class TestOutputFormatter_TC:
         self, clean_output_env
     ):
         """TC-OF-005: Auto-selection — non-list and empty list use JSON (Steps 3-4)."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         formatter = OutputFormatter(format_setting="auto")
 
@@ -596,7 +596,7 @@ class TestOutputFormatter_TC:
         self, clean_output_env
     ):
         """TC-OF-006: Auto-selection — uniform field set selects TOON (Steps 5-7)."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         formatter = OutputFormatter(format_setting="auto")
 
@@ -615,7 +615,7 @@ class TestOutputFormatter_TC:
 
     def test_TC_OF_007_pretty_print_json(self, clean_output_env):
         """TC-OF-007: Pretty-print JSON output."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         formatter = OutputFormatter(format_setting="json", pretty=True)
         result = formatter.format({"nested": {"key": "value"}})
@@ -626,7 +626,7 @@ class TestOutputFormatter_TC:
 
     def test_TC_OF_008_invalid_format_raises_value_error(self, clean_output_env):
         """TC-OF-008: Invalid format_setting raises ValueError."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         formatter = OutputFormatter(format_setting="xml")
         with pytest.raises(ValueError) as exc_info:
@@ -646,7 +646,7 @@ class TestLogSetup_TC:
 
     def test_TC_LS_001_ndjson_format_single_json_line(self, clean_log_env, capfd):
         """TC-LS-001: NDJSON format — single JSON line per log record."""
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         LogSetup.configure(log_level="WARNING")
         logger = logging.getLogger("test_tc_ls_001")
@@ -664,7 +664,7 @@ class TestLogSetup_TC:
 
     def test_TC_LS_002_required_fields_present(self, clean_log_env, capfd):
         """TC-LS-002: Required fields present in log record."""
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         LogSetup.configure(log_level="INFO")
         logger = logging.getLogger("test_tc_ls_002")
@@ -680,7 +680,7 @@ class TestLogSetup_TC:
 
     def test_TC_LS_003_log_level_filtering(self, clean_log_env, capfd):
         """TC-LS-003: Log level filtering."""
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         LogSetup.configure(log_level="WARNING")
         logger = logging.getLogger("test_tc_ls_003")
@@ -702,7 +702,7 @@ class TestLogSetup_TC:
         self, clean_log_env, capfd, monkeypatch
     ):
         """TC-LS-004: Environment variable log level override."""
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_LOG_LEVEL", "DEBUG")
         LogSetup.configure()
@@ -714,7 +714,7 @@ class TestLogSetup_TC:
 
     def test_TC_LS_005_invalid_log_level_raises(self, clean_log_env):
         """TC-LS-005: Invalid log level raises ValueError."""
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         with pytest.raises(ValueError) as exc_info:
             LogSetup.configure(log_level="TRACE")
@@ -723,7 +723,7 @@ class TestLogSetup_TC:
 
     def test_TC_LS_006_context_extra_fields_in_log(self, clean_log_env, capfd):
         """TC-LS-006: Context/extra fields included in log output."""
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         LogSetup.configure(log_level="WARNING")
         logger = logging.getLogger("test_tc_ls_006")
@@ -739,7 +739,7 @@ class TestLogSetup_TC:
 
     def test_TC_LS_007_metadata_separator_and_emit(self, clean_log_env, capfd):
         """TC-LS-007: Metadata separator and emit_metadata."""
-        from foundry_cli.common.log_setup import METADATA_SEPARATOR, LogSetup
+        from pal_found_cli.common.log_setup import METADATA_SEPARATOR, LogSetup
 
         LogSetup.emit_metadata_separator()
         output = capfd.readouterr().err
@@ -769,8 +769,8 @@ class TestIntegration_TC:
         """TC-INT-001: RetryHandler + ErrorSerializer — retry exhaustion produces correct exit code."""
         import requests
 
-        from foundry_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.error_serializer import EXIT_USER_INPUT, ErrorSerializer
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=1, base_delay=0.001)
         serializer = ErrorSerializer()
@@ -795,8 +795,8 @@ class TestIntegration_TC:
 
     def test_TC_INT_002_stderr_separation(self, clean_log_env, capfd):
         """TC-INT-002: OutputFormatter + LogSetup — stderr separation."""
-        from foundry_cli.common.log_setup import LogSetup
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         LogSetup.configure(log_level="WARNING")
         logger = logging.getLogger("test_tc_int_002")
@@ -821,10 +821,10 @@ class TestIntegration_TC:
         """TC-INT-003: Full pipeline — retry -> serialize -> format -> log."""
         import requests
 
-        from foundry_cli.common.error_serializer import ErrorSerializer
-        from foundry_cli.common.log_setup import LogSetup
-        from foundry_cli.common.output_formatter import OutputFormatter
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.retry import RetryHandler
 
         LogSetup.configure(log_level="WARNING")
         logger = logging.getLogger("test_tc_int_003")
@@ -883,7 +883,7 @@ class TestNonFunctional_TC:
         """TC-NF-001: Retry delay performance — sleep doesn't block event loop."""
         import requests
 
-        from foundry_cli.common.retry import RetryHandler
+        from pal_found_cli.common.retry import RetryHandler
 
         handler = RetryHandler(max_retries=3, base_delay=100.0, jitter=False)
 
@@ -901,7 +901,7 @@ class TestNonFunctional_TC:
 
     def test_TC_NF_002_error_serializer_memory(self, stdout_capture):
         """TC-NF-002: ErrorSerializer memory — traceback doesn't cause leak."""
-        from foundry_cli.common.error_serializer import ErrorSerializer
+        from pal_found_cli.common.error_serializer import ErrorSerializer
 
         serializer = ErrorSerializer()
 
@@ -919,7 +919,7 @@ class TestNonFunctional_TC:
         self, clean_log_env, stderr_capture, monkeypatch
     ):
         """TC-NF-003: Security — no secrets in log output."""
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         monkeypatch.setenv("FOUNDRY_TOKEN", "super_secret_token_123")
 
@@ -934,7 +934,7 @@ class TestNonFunctional_TC:
 
     def test_TC_NF_004_unicode_and_special_characters(self, clean_output_env):
         """TC-NF-004: OutputFormatter handles Unicode and special characters."""
-        from foundry_cli.common.output_formatter import OutputFormatter
+        from pal_found_cli.common.output_formatter import OutputFormatter
 
         formatter = OutputFormatter(format_setting="json")
         result = formatter.format(
@@ -946,7 +946,7 @@ class TestNonFunctional_TC:
 
     def test_TC_NF_005_log_setup_idempotent(self, clean_log_env, stderr_capture):
         """TC-NF-005: LogSetup singleton — configure() is idempotent."""
-        from foundry_cli.common.log_setup import LogSetup
+        from pal_found_cli.common.log_setup import LogSetup
 
         # First configure
         logger1 = LogSetup.configure(log_level="WARNING")

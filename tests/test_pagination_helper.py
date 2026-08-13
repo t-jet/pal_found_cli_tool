@@ -26,7 +26,7 @@ _SRC = Path(__file__).parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from foundry_cli.common.pagination_helper import (
+from pal_found_cli.common.pagination_helper import (
     MAX_BATCH_PAGES,
     PaginationHelper,
 )
@@ -153,7 +153,7 @@ class TestBatchAggregation:
 
     def test_env_max_batch_cannot_raise_hard_cap(self, monkeypatch):
         """Environment override cannot raise the SRS hard cap above 40."""
-        import foundry_cli.common.pagination_helper as pagination_module
+        import pal_found_cli.common.pagination_helper as pagination_module
 
         monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_MAX_BATCH_PAGES", "100")
         reloaded = importlib.reload(pagination_module)
@@ -272,7 +272,7 @@ class TestEmitMetadata:
         captured = capsys.readouterr()
         lines = captured.err.strip().splitlines()
         # First line is the ADR-005 metadata separator.
-        from foundry_cli.common.log_setup import METADATA_SEPARATOR
+        from pal_found_cli.common.log_setup import METADATA_SEPARATOR
 
         assert lines[0] == METADATA_SEPARATOR
         payload = json.loads(lines[1])
@@ -300,7 +300,7 @@ class TestEmitMetadata:
         helper.emit_metadata()
         captured = capsys.readouterr()
         lines = captured.err.strip().splitlines()
-        from foundry_cli.common.log_setup import METADATA_SEPARATOR
+        from pal_found_cli.common.log_setup import METADATA_SEPARATOR
 
         assert lines[0] == METADATA_SEPARATOR
         assert json.loads(lines[1]) == {

@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-from foundry_cli.language_models.scripts import foundry_language_models_cli as packaged
+from pal_found_cli.language_models.scripts import pal_found_language_models_cli as packaged
 
 
 def test_console_main_owns_asyncio_boundary(monkeypatch) -> None:
@@ -15,7 +15,7 @@ def test_console_main_owns_asyncio_boundary(monkeypatch) -> None:
 
 
 def test_claude_launcher_delegates_without_business_logic() -> None:
-    path = Path(".claude/skills/foundry-language-models/scripts/foundry_language_models_cli.py")
+    path = Path(".agents/skills/pal-found-language-models/scripts/pal_found_language_models_cli.py")
     spec = importlib.util.spec_from_file_location("language_models_launcher", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

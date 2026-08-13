@@ -14,7 +14,7 @@ SRC = Path(__file__).parents[1] / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from foundry_cli.common.tracing_provider import (
+from pal_found_cli.common.tracing_provider import (
     B3Context,
     InvalidTraceContextError,
     TracingProvider,
@@ -182,7 +182,7 @@ async def test_execute_traced_carries_same_b3_context_across_attempts_and_restor
     """
     import requests
 
-    from foundry_cli.common.retry import RetryHandler
+    from pal_found_cli.common.retry import RetryHandler
 
     handler = RetryHandler(
         max_retries=2,

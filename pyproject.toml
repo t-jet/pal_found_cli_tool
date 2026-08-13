@@ -25,66 +25,48 @@ dev = [
 ]
 
 [project.scripts]
-# The pal-found-* names are the public interface. Legacy names remain as
-# compatibility aliases until the package rename migration is complete.
-pal-found-datasets = "foundry_cli.datasets.scripts.foundry_datasets_cli:main"
-pal-found-filesystem = "foundry_cli.filesystem.scripts.foundry_filesystem_cli:console_main"
-pal-found-functions = "foundry_cli.functions.scripts.foundry_functions_cli:console_main"
-pal-found-ontologies = "foundry_cli.ontologies.scripts.foundry_ontologies_cli:console_main"
-pal-found-admin = "foundry_cli.admin.scripts.foundry_admin_cli:console_main"
-pal-found-audit = "foundry_cli.audit.scripts.foundry_audit_cli:console_main"
-pal-found-aip-agents = "foundry_cli.aip_agents.scripts.foundry_aip_agents_cli:console_main"
-pal-found-language-models = "foundry_cli.language_models.scripts.foundry_language_models_cli:console_main"
-pal-found-models = "foundry_cli.models.scripts.foundry_models_cli:console_main"
-pal-found-orchestration = "foundry_cli.orchestration.scripts.foundry_orchestration_cli:console_main"
-pal-found-sql-queries = "foundry_cli.sql_queries.scripts.foundry_sql_queries_cli:console_main"
-pal-found-streams = "foundry_cli.streams.scripts.foundry_streams_cli:console_main"
-pal-found-connectivity = "foundry_cli.connectivity.scripts.foundry_connectivity_cli:console_main"
-pal-found-media-sets = "foundry_cli.media_sets.scripts.foundry_media_sets_cli:console_main"
-pal-found-checkpoints = "foundry_cli.checkpoints.scripts.foundry_checkpoints_cli:console_main"
-pal-found-data-health = "foundry_cli.data_health.scripts.foundry_data_health_cli:console_main"
-pal-found-third-party-applications = "foundry_cli.third_party_applications.scripts.foundry_third_party_applications_cli:console_main"
-pal-found-widgets = "foundry_cli.widgets.scripts.foundry_widgets_cli:console_main"
-foundry-datasets = "foundry_cli.datasets.scripts.foundry_datasets_cli:main"
-foundry-filesystem = "foundry_cli.filesystem.scripts.foundry_filesystem_cli:console_main"
-foundry-functions = "foundry_cli.functions.scripts.foundry_functions_cli:console_main"
-foundry-ontologies = "foundry_cli.ontologies.scripts.foundry_ontologies_cli:console_main"
-foundry-admin = "foundry_cli.admin.scripts.foundry_admin_cli:console_main"
-foundry-audit = "foundry_cli.audit.scripts.foundry_audit_cli:console_main"
-foundry-aip-agents = "foundry_cli.aip_agents.scripts.foundry_aip_agents_cli:console_main"
-foundry-language-models = "foundry_cli.language_models.scripts.foundry_language_models_cli:console_main"
-foundry-models = "foundry_cli.models.scripts.foundry_models_cli:console_main"
-foundry-orchestration = "foundry_cli.orchestration.scripts.foundry_orchestration_cli:console_main"
-foundry-sql-queries = "foundry_cli.sql_queries.scripts.foundry_sql_queries_cli:console_main"
-foundry-streams = "foundry_cli.streams.scripts.foundry_streams_cli:console_main"
-foundry-connectivity = "foundry_cli.connectivity.scripts.foundry_connectivity_cli:console_main"
-foundry-media-sets = "foundry_cli.media_sets.scripts.foundry_media_sets_cli:console_main"
-foundry-checkpoints = "foundry_cli.checkpoints.scripts.foundry_checkpoints_cli:console_main"
-foundry-data-health = "foundry_cli.data_health.scripts.foundry_data_health_cli:console_main"
-foundry-third-party-applications = "foundry_cli.third_party_applications.scripts.foundry_third_party_applications_cli:console_main"
-foundry-widgets = "foundry_cli.widgets.scripts.foundry_widgets_cli:console_main"
+# The pal-found-* names are the public interface.
+pal-found-datasets = "pal_found_cli.datasets.scripts.pal_found_datasets_cli:main"
+pal-found-filesystem = "pal_found_cli.filesystem.scripts.pal_found_filesystem_cli:console_main"
+pal-found-functions = "pal_found_cli.functions.scripts.pal_found_functions_cli:console_main"
+pal-found-ontologies = "pal_found_cli.ontologies.scripts.pal_found_ontologies_cli:console_main"
+pal-found-admin = "pal_found_cli.admin.scripts.pal_found_admin_cli:console_main"
+pal-found-audit = "pal_found_cli.audit.scripts.pal_found_audit_cli:console_main"
+pal-found-aip-agents = "pal_found_cli.aip_agents.scripts.pal_found_aip_agents_cli:console_main"
+pal-found-language-models = "pal_found_cli.language_models.scripts.pal_found_language_models_cli:console_main"
+pal-found-models = "pal_found_cli.models.scripts.pal_found_models_cli:console_main"
+pal-found-orchestration = "pal_found_cli.orchestration.scripts.pal_found_orchestration_cli:console_main"
+pal-found-sql-queries = "pal_found_cli.sql_queries.scripts.pal_found_sql_queries_cli:console_main"
+pal-found-streams = "pal_found_cli.streams.scripts.pal_found_streams_cli:console_main"
+pal-found-connectivity = "pal_found_cli.connectivity.scripts.pal_found_connectivity_cli:console_main"
+pal-found-media-sets = "pal_found_cli.media_sets.scripts.pal_found_media_sets_cli:console_main"
+pal-found-checkpoints = "pal_found_cli.checkpoints.scripts.pal_found_checkpoints_cli:console_main"
+pal-found-data-health = "pal_found_cli.data_health.scripts.pal_found_data_health_cli:console_main"
+pal-found-third-party-applications = "pal_found_cli.third_party_applications.scripts.pal_found_third_party_applications_cli:console_main"
+pal-found-widgets = "pal_found_cli.widgets.scripts.pal_found_widgets_cli:console_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+namespaces = false
 
 [tool.setuptools_scm]
 fallback_version = "0.1.0"
-version_file = "src/foundry_cli/_version.py"
+version_file = "src/pal_found_cli/_version.py"
 
 [tool.setuptools.package-data]
-"foundry_cli.audit" = ["metadata-allow-list.md"]
-"foundry_cli.aip_agents" = ["metadata-allow-list.md"]
-"foundry_cli.language_models" = ["metadata-allow-list.md"]
-"foundry_cli.models" = ["metadata-allow-list.md"]
-"foundry_cli.orchestration" = ["metadata-allow-list.md"]
-"foundry_cli.sql_queries" = ["metadata-allow-list.md"]
-"foundry_cli.streams" = ["metadata-allow-list.md"]
-"foundry_cli.connectivity" = ["metadata-allow-list.md"]
-"foundry_cli.media_sets" = ["metadata-allow-list.md"]
-"foundry_cli.checkpoints" = ["metadata-allow-list.md"]
-"foundry_cli.data_health" = ["metadata-allow-list.md"]
-"foundry_cli.third_party_applications" = ["metadata-allow-list.md"]
-"foundry_cli.widgets" = ["metadata-allow-list.md"]
+"pal_found_cli.audit" = ["metadata-allow-list.md"]
+"pal_found_cli.aip_agents" = ["metadata-allow-list.md"]
+"pal_found_cli.language_models" = ["metadata-allow-list.md"]
+"pal_found_cli.models" = ["metadata-allow-list.md"]
+"pal_found_cli.orchestration" = ["metadata-allow-list.md"]
+"pal_found_cli.sql_queries" = ["metadata-allow-list.md"]
+"pal_found_cli.streams" = ["metadata-allow-list.md"]
+"pal_found_cli.connectivity" = ["metadata-allow-list.md"]
+"pal_found_cli.media_sets" = ["metadata-allow-list.md"]
+"pal_found_cli.checkpoints" = ["metadata-allow-list.md"]
+"pal_found_cli.data_health" = ["metadata-allow-list.md"]
+"pal_found_cli.third_party_applications" = ["metadata-allow-list.md"]
+"pal_found_cli.widgets" = ["metadata-allow-list.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -102,35 +84,35 @@ select = ["E", "F"]
 ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
-"src/foundry_cli/ontologies/scripts/*.py" = ["E402"]
-"src/foundry_cli/filesystem/scripts/*.py" = ["E402"]
-"src/foundry_cli/functions/scripts/*.py" = ["E402"]
-"src/foundry_cli/admin/scripts/*.py" = ["E402"]
-"src/foundry_cli/audit/scripts/*.py" = ["E402"]
-"src/foundry_cli/aip_agents/scripts/*.py" = ["E402"]
-"src/foundry_cli/language_models/scripts/*.py" = ["E402"]
-"src/foundry_cli/models/scripts/*.py" = ["E402"]
-"src/foundry_cli/orchestration/scripts/*.py" = ["E402"]
-"src/foundry_cli/sql_queries/scripts/*.py" = ["E402"]
-"src/foundry_cli/streams/scripts/*.py" = ["E402"]
-"src/foundry_cli/connectivity/scripts/*.py" = ["E402"]
-"src/foundry_cli/media_sets/scripts/*.py" = ["E402"]
-"src/foundry_cli/checkpoints/scripts/*.py" = ["E402"]
-"src/foundry_cli/data_health/scripts/*.py" = ["E402"]
-"src/foundry_cli/third_party_applications/scripts/*.py" = ["E402"]
-"src/foundry_cli/widgets/scripts/*.py" = ["E402"]
+"src/pal_found_cli/ontologies/scripts/*.py" = ["E402"]
+"src/pal_found_cli/filesystem/scripts/*.py" = ["E402"]
+"src/pal_found_cli/functions/scripts/*.py" = ["E402"]
+"src/pal_found_cli/admin/scripts/*.py" = ["E402"]
+"src/pal_found_cli/audit/scripts/*.py" = ["E402"]
+"src/pal_found_cli/aip_agents/scripts/*.py" = ["E402"]
+"src/pal_found_cli/language_models/scripts/*.py" = ["E402"]
+"src/pal_found_cli/models/scripts/*.py" = ["E402"]
+"src/pal_found_cli/orchestration/scripts/*.py" = ["E402"]
+"src/pal_found_cli/sql_queries/scripts/*.py" = ["E402"]
+"src/pal_found_cli/streams/scripts/*.py" = ["E402"]
+"src/pal_found_cli/connectivity/scripts/*.py" = ["E402"]
+"src/pal_found_cli/media_sets/scripts/*.py" = ["E402"]
+"src/pal_found_cli/checkpoints/scripts/*.py" = ["E402"]
+"src/pal_found_cli/data_health/scripts/*.py" = ["E402"]
+"src/pal_found_cli/third_party_applications/scripts/*.py" = ["E402"]
+"src/pal_found_cli/widgets/scripts/*.py" = ["E402"]
 "tests/*.py" = ["E402", "E741", "F401", "F841"]
 
 [tool.coverage.run]
-source = ["foundry_cli"]
+source = ["pal_found_cli"]
 branch = true
 omit = [
     "tests/*",
     "**/__pycache__/*",
-    "src/foundry_cli/datasets/scripts/foundry_datasets_cli.py",
-    "src/foundry_cli/filesystem/scripts/foundry_filesystem_cli.py",
-    "src/foundry_cli/ontologies/scripts/foundry_ontologies_cli.py",
-    "src/foundry_cli/audit/scripts/foundry_audit_cli.py",
+    "src/pal_found_cli/datasets/scripts/pal_found_datasets_cli.py",
+    "src/pal_found_cli/filesystem/scripts/pal_found_filesystem_cli.py",
+    "src/pal_found_cli/ontologies/scripts/pal_found_ontologies_cli.py",
+    "src/pal_found_cli/audit/scripts/pal_found_audit_cli.py",
 ]
 
 [tool.coverage.report]

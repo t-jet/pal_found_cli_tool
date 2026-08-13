@@ -76,7 +76,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest tests/ --cov=foundry_cli --cov-report=term-missing --cov-report=xml -v
+          pytest tests/ --cov=pal_found_cli --cov-report=term-missing --cov-report=xml -v
 
       - name: Upload coverage to codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'

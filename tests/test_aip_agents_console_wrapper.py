@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-from foundry_cli.aip_agents.scripts import foundry_aip_agents_cli as packaged
+from pal_found_cli.aip_agents.scripts import pal_found_aip_agents_cli as packaged
 
 
 def test_console_main_owns_asyncio_boundary(monkeypatch) -> None:
@@ -15,7 +15,7 @@ def test_console_main_owns_asyncio_boundary(monkeypatch) -> None:
 
 
 def test_claude_launcher_delegates_packaged_interfaces() -> None:
-    path = Path(".claude/skills/foundry-aip-agents/scripts/foundry_aip_agents_cli.py")
+    path = Path(".agents/skills/pal-found-aip-agents/scripts/pal_found_aip_agents_cli.py")
     spec = importlib.util.spec_from_file_location("aip_agents_launcher", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

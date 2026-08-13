@@ -15,7 +15,7 @@ SRC = Path(__file__).parents[1] / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from foundry_cli.common.binary_download_handler import (
+from pal_found_cli.common.binary_download_handler import (
     BinaryDownloadHandler,
     DownloadError,
     InvalidDownloadError,
@@ -253,7 +253,7 @@ async def test_download_dir_permissions_are_umask_independent_on_posix(
 
     monkeypatch.setattr(os, "chmod", recording_chmod)
     monkeypatch.setattr(
-        "foundry_cli.common.binary_download_handler.os.chmod", recording_chmod
+        "pal_found_cli.common.binary_download_handler.os.chmod", recording_chmod
     )
 
     await _save(handler, ChunkStream([b"payload"]))

@@ -26,10 +26,10 @@ _SRC = Path(__file__).parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from foundry_cli.common.async_client_factory import AsyncClientFactory
-from foundry_cli.common.auth_provider import AuthProvider
-from foundry_cli.common.config_loader import ConfigLoader, ConfigurationError
-from foundry_cli.common.error_serializer import EXIT_CONFIGURATION
+from pal_found_cli.common.async_client_factory import AsyncClientFactory
+from pal_found_cli.common.auth_provider import AuthProvider
+from pal_found_cli.common.config_loader import ConfigLoader, ConfigurationError
+from pal_found_cli.common.error_serializer import EXIT_CONFIGURATION
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -67,15 +67,15 @@ def clean_env(monkeypatch):
 def mock_sdk():
     """Mock foundry_sdk modules so we don't need the real SDK installed."""
     mock_user_token_auth = MagicMock()
-    mock_foundry_client = MagicMock()
+    mock_pal_found_client = MagicMock()
 
     mock_sdk_module = MagicMock()
     mock_sdk_module.UserTokenAuth = mock_user_token_auth
-    mock_sdk_module.FoundryClient = mock_foundry_client
-    mock_sdk_module.AsyncFoundryClient = mock_foundry_client
+    mock_sdk_module.FoundryClient = mock_pal_found_client
+    mock_sdk_module.AsyncFoundryClient = mock_pal_found_client
 
     with patch.dict(sys.modules, {"foundry_sdk": mock_sdk_module}):
-        yield mock_sdk_module, mock_user_token_auth, mock_foundry_client
+        yield mock_sdk_module, mock_user_token_auth, mock_pal_found_client
 
 
 @pytest.fixture

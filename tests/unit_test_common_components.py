@@ -21,9 +21,9 @@ _SRC = Path(__file__).parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from foundry_cli.common.async_client_factory import AsyncClientFactory
-from foundry_cli.common.auth_provider import AuthProvider
-from foundry_cli.common.config_loader import (
+from pal_found_cli.common.async_client_factory import AsyncClientFactory
+from pal_found_cli.common.auth_provider import AuthProvider
+from pal_found_cli.common.config_loader import (
     DEFAULT_FORMAT,
     DEFAULT_MAX_TIMEOUT_S,
     DEFAULT_MIN_TIMEOUT_S,
@@ -384,7 +384,7 @@ class TestConfigLoaderPropertyAccessors:
         assert cfg.enable_tracing is False
 
     def test_log_level_default(self, clean_env):
-        from foundry_cli.common.log_setup import DEFAULT_LOG_LEVEL
+        from pal_found_cli.common.log_setup import DEFAULT_LOG_LEVEL
 
         cfg = ConfigLoader()
         assert cfg.log_level == DEFAULT_LOG_LEVEL
@@ -781,7 +781,7 @@ class TestAsyncClientFactoryCreate:
         mock_fc.assert_called_once()
         assert client is not None
 
-    def test_create_uses_async_foundry_client(self, clean_env, monkeypatch, mock_sdk):
+    def test_create_uses_async_pal_found_client(self, clean_env, monkeypatch, mock_sdk):
         """create() must instantiate AsyncFoundryClient, not FoundryClient (F1)."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
         monkeypatch.setenv(ENV_HOSTNAME, "https://host")
