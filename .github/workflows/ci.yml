@@ -80,7 +80,7 @@ jobs:
 
       - name: Upload coverage to codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
-        uses: codecov/codecov-action@1e68e06f1db7d8a6ecd0184c0811e798831b9dd5 # v5.0.0
+        uses: codecov/codecov-action@c23a129e932ebdcb56ca1565c68c6abdbf173769 # v5.0.0
         with:
           files: coverage.xml
           fail_ci_if_error: false
