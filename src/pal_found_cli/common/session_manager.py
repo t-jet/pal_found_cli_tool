@@ -105,7 +105,7 @@ class _AliasLock:
         file_obj = self.path.open("a+b")
         try:
             if os.name == "nt":
-                import msvcrt
+                msvcrt: Any = importlib.import_module("msvcrt")
 
                 file_obj.seek(0, os.SEEK_END)
                 if file_obj.tell() == 0:
@@ -139,7 +139,7 @@ class _AliasLock:
             return
         try:
             if os.name == "nt":
-                import msvcrt
+                msvcrt: Any = importlib.import_module("msvcrt")
 
                 self._file.seek(0)
                 msvcrt.locking(self._file.fileno(), msvcrt.LK_UNLCK, 1)
