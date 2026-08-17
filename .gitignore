@@ -14,7 +14,13 @@ htmlcov/
 # Local environments and secrets
 .venv/
 .env
-.env.local
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Local tooling
 .ept/
