@@ -1,0 +1,128 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm>=8.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pal_found_cli"
+dynamic = ["version"]
+description = "Foundry CLI - 33 operations across 5 resource clients"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "foundry-platform-sdk>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "mypy>=1.0",
+    "ruff>=0.4.0",
+    "bandit>=1.7.0",
+]
+
+[project.scripts]
+# The pal-found-* names are the public interface.
+pal-found-datasets = "pal_found_cli.datasets.scripts.pal_found_datasets_cli:main"
+pal-found-filesystem = "pal_found_cli.filesystem.scripts.pal_found_filesystem_cli:console_main"
+pal-found-functions = "pal_found_cli.functions.scripts.pal_found_functions_cli:console_main"
+pal-found-ontologies = "pal_found_cli.ontologies.scripts.pal_found_ontologies_cli:console_main"
+pal-found-admin = "pal_found_cli.admin.scripts.pal_found_admin_cli:console_main"
+pal-found-audit = "pal_found_cli.audit.scripts.pal_found_audit_cli:console_main"
+pal-found-aip-agents = "pal_found_cli.aip_agents.scripts.pal_found_aip_agents_cli:console_main"
+pal-found-language-models = "pal_found_cli.language_models.scripts.pal_found_language_models_cli:console_main"
+pal-found-models = "pal_found_cli.models.scripts.pal_found_models_cli:console_main"
+pal-found-orchestration = "pal_found_cli.orchestration.scripts.pal_found_orchestration_cli:console_main"
+pal-found-sql-queries = "pal_found_cli.sql_queries.scripts.pal_found_sql_queries_cli:console_main"
+pal-found-streams = "pal_found_cli.streams.scripts.pal_found_streams_cli:console_main"
+pal-found-connectivity = "pal_found_cli.connectivity.scripts.pal_found_connectivity_cli:console_main"
+pal-found-media-sets = "pal_found_cli.media_sets.scripts.pal_found_media_sets_cli:console_main"
+pal-found-checkpoints = "pal_found_cli.checkpoints.scripts.pal_found_checkpoints_cli:console_main"
+pal-found-data-health = "pal_found_cli.data_health.scripts.pal_found_data_health_cli:console_main"
+pal-found-third-party-applications = "pal_found_cli.third_party_applications.scripts.pal_found_third_party_applications_cli:console_main"
+pal-found-widgets = "pal_found_cli.widgets.scripts.pal_found_widgets_cli:console_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = false
+
+[tool.setuptools_scm]
+fallback_version = "0.1.0"
+version_file = "src/pal_found_cli/_version.py"
+
+[tool.setuptools.package-data]
+"pal_found_cli.audit" = ["metadata-allow-list.md"]
+"pal_found_cli.aip_agents" = ["metadata-allow-list.md"]
+"pal_found_cli.language_models" = ["metadata-allow-list.md"]
+"pal_found_cli.models" = ["metadata-allow-list.md"]
+"pal_found_cli.orchestration" = ["metadata-allow-list.md"]
+"pal_found_cli.sql_queries" = ["metadata-allow-list.md"]
+"pal_found_cli.streams" = ["metadata-allow-list.md"]
+"pal_found_cli.connectivity" = ["metadata-allow-list.md"]
+"pal_found_cli.media_sets" = ["metadata-allow-list.md"]
+"pal_found_cli.checkpoints" = ["metadata-allow-list.md"]
+"pal_found_cli.data_health" = ["metadata-allow-list.md"]
+"pal_found_cli.third_party_applications" = ["metadata-allow-list.md"]
+"pal_found_cli.widgets" = ["metadata-allow-list.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/pal_found_cli/ontologies/scripts/*.py" = ["E402"]
+"src/pal_found_cli/filesystem/scripts/*.py" = ["E402"]
+"src/pal_found_cli/functions/scripts/*.py" = ["E402"]
+"src/pal_found_cli/admin/scripts/*.py" = ["E402"]
+"src/pal_found_cli/audit/scripts/*.py" = ["E402"]
+"src/pal_found_cli/aip_agents/scripts/*.py" = ["E402"]
+"src/pal_found_cli/language_models/scripts/*.py" = ["E402"]
+"src/pal_found_cli/models/scripts/*.py" = ["E402"]
+"src/pal_found_cli/orchestration/scripts/*.py" = ["E402"]
+"src/pal_found_cli/sql_queries/scripts/*.py" = ["E402"]
+"src/pal_found_cli/streams/scripts/*.py" = ["E402"]
+"src/pal_found_cli/connectivity/scripts/*.py" = ["E402"]
+"src/pal_found_cli/media_sets/scripts/*.py" = ["E402"]
+"src/pal_found_cli/checkpoints/scripts/*.py" = ["E402"]
+"src/pal_found_cli/data_health/scripts/*.py" = ["E402"]
+"src/pal_found_cli/third_party_applications/scripts/*.py" = ["E402"]
+"src/pal_found_cli/widgets/scripts/*.py" = ["E402"]
+"tests/*.py" = ["E402", "E741", "F401", "F841"]
+
+[tool.coverage.run]
+source = ["pal_found_cli"]
+branch = true
+omit = [
+    "tests/*",
+    "**/__pycache__/*",
+    "src/pal_found_cli/datasets/scripts/pal_found_datasets_cli.py",
+    "src/pal_found_cli/filesystem/scripts/pal_found_filesystem_cli.py",
+    "src/pal_found_cli/ontologies/scripts/pal_found_ontologies_cli.py",
+    "src/pal_found_cli/audit/scripts/pal_found_audit_cli.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "def __repr__",
+]
+
+[tool.coverage.xml]
+output = "coverage.xml"
