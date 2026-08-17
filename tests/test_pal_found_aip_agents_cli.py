@@ -7,6 +7,7 @@ import contextvars
 import json
 import sys
 from contextlib import AbstractContextManager
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Literal
@@ -251,7 +252,8 @@ async def test_streaming_continue_persists_only_configured_prefix(
     factory = _Factory(root)
     cfg = _patch_main(monkeypatch, tmp_path, factory)
     manager = SessionManager(config=cfg)
-    state = SessionState("s", "a", None, "2026-08-09T00:00:00+00:00", "2026-08-09T00:00:00+00:00", "active", [])
+    now = datetime.now(UTC).isoformat()
+    state = SessionState("s", "a", None, now, now, "active", [])
     manager.update("alias", state)
     session.streaming_continue = AsyncMock(return_value=b"abcdef")
     monkeypatch.setattr(sys, "argv", ["cmd", "session", "streaming-continue", "--alias", "alias", "--parameter-inputs-json", "{}", "--user-input-json", "{}", "--format", "toon"])
@@ -270,7 +272,8 @@ async def test_purge_is_local_idempotent_and_makes_no_client(
     factory = _Factory(root)
     cfg = _patch_main(monkeypatch, tmp_path, factory)
     manager = SessionManager(config=cfg)
-    state = SessionState("s", "a", None, "2026-08-09T00:00:00+00:00", "2026-08-09T00:00:00+00:00", "active", [])
+    now = datetime.now(UTC).isoformat()
+    state = SessionState("s", "a", None, now, now, "active", [])
     manager.update("alias", state)
     monkeypatch.setattr(sys, "argv", ["cmd", "session", "purge"])
     assert await cli.main() == 0
@@ -288,7 +291,8 @@ async def test_purge_acl_denial_precedes_mutation(
     factory = _Factory(root)
     cfg = _patch_main(monkeypatch, tmp_path, factory)
     manager = SessionManager(config=cfg)
-    state = SessionState("s", "a", None, "2026-08-09T00:00:00+00:00", "2026-08-09T00:00:00+00:00", "active", [])
+    now = datetime.now(UTC).isoformat()
+    state = SessionState("s", "a", None, now, now, "active", [])
     manager.update("alias", state)
     monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_READONLY", "true")
     monkeypatch.setattr(sys, "argv", ["cmd", "session", "purge"])

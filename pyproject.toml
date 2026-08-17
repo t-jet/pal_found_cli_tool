@@ -54,6 +54,7 @@ fallback_version = "0.1.0"
 version_file = "src/pal_found_cli/_version.py"
 
 [tool.setuptools.package-data]
+"pal_found_cli.common" = ["metadata-allow-list.md"]
 "pal_found_cli.audit" = ["metadata-allow-list.md"]
 "pal_found_cli.aip_agents" = ["metadata-allow-list.md"]
 "pal_found_cli.language_models" = ["metadata-allow-list.md"]

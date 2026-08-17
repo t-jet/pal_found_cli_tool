@@ -2,22 +2,12 @@
 
 from __future__ import annotations
 
-import importlib.util
 import subprocess
-import sys
 from pathlib import Path
 
 from pal_found_cli.data_health.scripts import pal_found_data_health_cli as packaged
 
 _ROOT = Path(__file__).parent.parent
-_LAUNCHER = (
-    _ROOT
-        / ".agents"
-    / "skills"
-    / "pal-found-data-health"
-    / "scripts"
-    / "pal_found_data_health_cli.py"
-)
 
 
 def test_console_main_owns_asyncio_boundary(monkeypatch) -> None:
@@ -30,19 +20,9 @@ def test_console_main_owns_asyncio_boundary(monkeypatch) -> None:
     assert packaged.console_main() is marker
 
 
-def test_claude_launcher_delegates_without_business_logic() -> None:
-    spec = importlib.util.spec_from_file_location("data_health_launcher", _LAUNCHER)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    assert module.build_parser is packaged.build_parser
-    assert module.main is packaged.main
-    assert module.console_main is packaged.console_main
-
-
-def test_claude_launcher_help_returns_zero_and_lists_exact_operations() -> None:
+def test_console_entry_point_help_returns_zero_and_lists_operations() -> None:
     completed = subprocess.run(
-        [sys.executable, str(_LAUNCHER), "--help"],
+        ["pal-found-data-health", "--help"],
         cwd=_ROOT,
         capture_output=True,
         text=True,

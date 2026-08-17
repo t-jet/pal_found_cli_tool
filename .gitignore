@@ -1,0 +1,22 @@
+# Python build and test artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environments and secrets
+.venv/
+.env
+.env.local
+
+# Local tooling
+.ept/
+.vscode/
+.idea/

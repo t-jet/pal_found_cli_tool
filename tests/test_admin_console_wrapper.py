@@ -66,25 +66,3 @@ async def test_packaged_main_success(monkeypatch, capsys):
 
     assert rc == pal_found_admin_cli.EXIT_SUCCESS
     assert "rid" in capsys.readouterr().out
-
-
-def test_claude_launcher_imports_packaged_cli():
-    import importlib.util
-    from pathlib import Path
-
-    launcher = (
-        Path(__file__).parent.parent
-        / ".agents"
-        / "skills"
-        / "pal-found-admin"
-        / "scripts"
-        / "pal_found_admin_cli.py"
-    )
-    spec = importlib.util.spec_from_file_location("foundry_admin_launcher", launcher)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    assert module.build_parser is pal_found_admin_cli.build_parser
-    assert module.console_main is pal_found_admin_cli.console_main

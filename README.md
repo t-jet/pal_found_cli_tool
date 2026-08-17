@@ -26,14 +26,15 @@ clean environment, and smoke-checked before PyPI publication.
 The conda recipe uses the same tag-derived version. After a channel release,
 install with `conda install -c t-jet pal_found_cli`.
 
-The project is split into three repositories:
+This repository contains the installable CLI. The project is split into three
+independently versioned repositories:
 
 - [design and documentation](https://github.com/t-jet/pal_found_cli)
 - [CLI tool](https://github.com/t-jet/pal_found_cli_tool)
 - [skills](https://github.com/t-jet/pal_found_cli_skills)
 
-See the [rename migration guide](.ept/docs/deliverables/development/DEV-037-rename-migration.md)
-when updating existing clones, scripts, or skill installations.
+Repository-split and rename design records live in the
+[design repository](https://github.com/t-jet/pal_found_cli).
 
 ## Development
 
@@ -53,4 +54,4 @@ python -m build
 twine check dist/*
 ```
 
-The repository coverage gate is 80% branch coverage. Current DEVOPS-002 validation measured 81.65% with 262 tests passing.
+The repository coverage gate is 80% branch coverage.

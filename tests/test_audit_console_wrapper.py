@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import subprocess
 import sys
@@ -15,14 +14,6 @@ import pytest
 from pal_found_cli.audit.scripts import pal_found_audit_cli
 
 _ROOT = Path(__file__).parent.parent
-_LAUNCHER = (
-    _ROOT
-    / ".agents"
-    / "skills"
-    / "pal-found-audit"
-    / "scripts"
-    / "pal_found_audit_cli.py"
-)
 
 
 def _subprocess_env() -> dict[str, str]:
@@ -66,30 +57,12 @@ def test_console_main_uses_one_asyncio_run_boundary(monkeypatch) -> None:
     assert len(calls) == 1
 
 
-def test_claude_launcher_is_thin_and_reexports_packaged_interfaces() -> None:
-    spec = importlib.util.spec_from_file_location("foundry_audit_launcher", _LAUNCHER)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    assert module.build_parser is pal_found_audit_cli.build_parser
-    assert module.main is pal_found_audit_cli.main
-    assert module.console_main is pal_found_audit_cli.console_main
-    source = _LAUNCHER.read_text(encoding="utf-8")
-    assert "OP_SPECS" not in source
-    assert "BinaryDownloadHandler" not in source
-    assert "with_streaming_response" not in source
-
-
 def test_imports_create_no_download_directory_or_network_side_effect(
     tmp_path: Path,
 ) -> None:
     code = (
         "import pal_found_cli.audit; "
-        "import pal_found_cli.audit.scripts.pal_found_audit_cli; "
-        f"exec(compile(open({str(_LAUNCHER)!r}, encoding='utf-8').read(), "
-        f"{str(_LAUNCHER)!r}, 'exec'), "
-        f"{{'__name__': 'import_only', '__file__': {str(_LAUNCHER)!r}}})"
+        "import pal_found_cli.audit.scripts.pal_found_audit_cli"
     )
     completed = subprocess.run(
         [sys.executable, "-c", code],
@@ -125,9 +98,9 @@ def test_packaged_module_help_returns_zero_and_lists_exact_operations() -> None:
     assert "FOUNDRY_TOKEN" not in completed.stderr
 
 
-def test_claude_launcher_help_returns_zero_and_lists_exact_operations() -> None:
+def test_console_entry_point_help_returns_zero_and_lists_exact_operations() -> None:
     completed = subprocess.run(
-        [sys.executable, str(_LAUNCHER), "--help"],
+        ["pal-found-audit", "--help"],
         cwd=_ROOT,
         env=_subprocess_env(),
         capture_output=True,
@@ -144,7 +117,7 @@ def test_claude_launcher_help_returns_zero_and_lists_exact_operations() -> None:
 def test_operation_help_surfaces_propagate_zero_exit_codes() -> None:
     for operation in ("list", "content"):
         completed = subprocess.run(
-            [sys.executable, str(_LAUNCHER), "log-file", operation, "--help"],
+            ["pal-found-audit", "log-file", operation, "--help"],
             cwd=_ROOT,
             env=_subprocess_env(),
             capture_output=True,
@@ -255,20 +228,6 @@ else:
     )
     assert policy_result.returncode == 0, policy_result.stderr
     assert "list=PERMITTED content=BLOCKED" in policy_result.stdout
-
-    launcher_result = subprocess.run(
-        [str(environment["python"]), str(_LAUNCHER), "--help"],
-        cwd=environment["cwd"],
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=20,
-        check=False,
-    )
-    assert launcher_result.returncode == 0, launcher_result.stderr
-    assert "log-file list" in launcher_result.stdout
-    assert "log-file content" in launcher_result.stdout
-
 
 def test_wheel_and_editable_installs_work_from_arbitrary_cwd_without_pythonpath(
     isolated_package_environment: dict[str, Path],

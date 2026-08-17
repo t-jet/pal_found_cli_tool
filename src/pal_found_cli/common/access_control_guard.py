@@ -323,10 +323,9 @@ class AccessControlGuard:
         if self._metadata_allowlist_path:
             allowlist_path = Path(self._metadata_allowlist_path)
         else:
-            # Default: look for metadata-allow-list.md in .ept/docs
-            allowlist_path = Path(
-                ".ept/docs/deliverables/architecture/metadata-allow-list.md"
-            )
+            # Core namespaces share a packaged policy so installed commands do
+            # not depend on the design repository or the current directory.
+            allowlist_path = Path(__file__).with_name("metadata-allow-list.md")
 
         if not allowlist_path.exists():
             return set()
