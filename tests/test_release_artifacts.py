@@ -35,6 +35,12 @@ def test_conda_recipe_aligns_name_and_tag_version():
     assert "pal-found-datasets" in text
 
 
+def test_conda_upload_glob_targets_conda_artifact_format():
+    text = (ROOT / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
+    assert "anaconda -t \"$ANACONDA_API_TOKEN\" upload --user t-jet conda-channel/*/*.conda --force" in text
+    assert "conda-channel/*/*.tar.bz2" not in text
+
+
 def test_skills_distribution_readme_has_clone_copy_update_flow():
     text = (ROOT / "pal_found_cli_skills" / "README.md").read_text(encoding="utf-8")
     for marker in ("git clone", ".agents/skills", "Claude Code", "## Update"):

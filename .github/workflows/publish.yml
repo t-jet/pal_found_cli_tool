@@ -82,4 +82,4 @@ jobs:
             exit 0
           fi
           conda install --yes anaconda-client
-          anaconda -t "$ANACONDA_API_TOKEN" upload --user t-jet conda-channel/*/*.tar.bz2 --force
+          anaconda -t "$ANACONDA_API_TOKEN" upload --user t-jet conda-channel/*/*.conda --force
