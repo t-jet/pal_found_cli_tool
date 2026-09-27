@@ -24,7 +24,7 @@ Each release is built from a `vX.Y.Z` tag, staged on Test PyPI, installed into a
 clean environment, and smoke-checked before PyPI publication.
 
 The conda recipe uses the same tag-derived version. After a channel release,
-install with `conda install -c t-jet pal_found_cli`. 
+install with `conda install -c t-jet pal_found_cli`.
 
 This repository contains the installable CLI. The project is split into three
 independently versioned repositories:
