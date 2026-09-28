@@ -11,6 +11,10 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# setuptools-scm generated version file (tracked file causes dirty-state
+# version bumps; see setuptools-scm issue #468)
+src/pal_found_cli/_version.py
+
 # Local environments and secrets
 .venv/
 .env
