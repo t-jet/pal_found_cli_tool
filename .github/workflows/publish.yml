@@ -69,6 +69,11 @@ jobs:
         env:
           GIT_TAG: ${{ github.ref_name }}
         run: |
+          # setup-miniconda does not configure channels by default; without them
+          # conda-build fails with "NoChannelsConfiguredError" when resolving host
+          # dependencies (setuptools, pip, setuptools-scm, python, wheel).
+          conda config --add channels conda-forge
+          conda config --add channels defaults
           conda install --yes conda-build
           # Use the standalone conda-build binary instead of `conda build`.
           # On some conda versions the `build` subcommand is not registered from
