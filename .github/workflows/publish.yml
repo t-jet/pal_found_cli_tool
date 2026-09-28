@@ -70,7 +70,12 @@ jobs:
           GIT_TAG: ${{ github.ref_name }}
         run: |
           conda install --yes conda-build
-          conda build conda.recipe --output-folder conda-channel
+          # Use the standalone conda-build binary instead of `conda build`.
+          # On some conda versions the `build` subcommand is not registered from
+          # the conda-build plugin in a non-base activated environment, which made
+          # `conda build` fail with "invalid choice: 'build'". The conda-build binary
+          # is always installed by the package and is version independent.
+          conda-build conda.recipe --output-folder conda-channel
 
       - name: Publish conda package when channel permission exists
         shell: bash -el {0}
