@@ -48,6 +48,13 @@ jobs:
           # have publish attestations". Attestations bind to one index/OIDC exchange,
           # so generate them only on the final production publish below.
           attestations: false
+          # The same tag can legitimately be re-pushed (e.g. to re-run a failed
+          # production step); Test PyPI already holds the identical 0.1.2 filenames
+          # from the first staging, so a plain re-upload returns 400 "File already
+          # exists". Skip files that are already staged and let the verify step
+          # re-confirm them. The production step keeps skip-existing=false: a file
+          # that already exists on production must fail loudly, not be masked.
+          skip-existing: true
 
       - name: Verify staged release in clean environment
         env:
