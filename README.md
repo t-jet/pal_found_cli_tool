@@ -26,6 +26,38 @@ clean environment, and smoke-checked before PyPI publication.
 The conda recipe uses the same tag-derived version. After a channel release,
 install with `conda install -c t-jet pal_found_cli`.
 
+## Authentication and configuration
+
+The CLI authenticates to Foundry with an API token and a target hostname, read
+from a `.env` file or the environment. Before running any `pal-found-*` command,
+configure credentials:
+
+```bash
+# Copy the template and fill in your values
+cp .env.example .env
+```
+
+Set at minimum:
+
+```dotenv
+FOUNDRY_TOKEN=your_foundry_api_token_here
+FOUNDRY_HOSTNAME=https://foundry.example.com
+```
+
+`FOUNDRY_TOKEN` is your Foundry API token (personal or service account) and
+`FOUNDRY_HOSTNAME` is the URL of the Foundry instance you target. The `.env`
+file is searched per ADR-006 (explicit path override via
+`FOUNDRY_AGENTIC_CLI_ENV_FILE`, otherwise the repository root). Do not commit
+`.env` to version control. Optional settings cover request timeout, output
+format, access guards, retry, pagination, and tracing; see `.env.example` for
+the full list.
+
+Then verify the setup:
+
+```bash
+pal-found-datasets --help
+```
+
 This repository contains the installable CLI. The project is split into three
 independently versioned repositories:
 
