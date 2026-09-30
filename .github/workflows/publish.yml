@@ -42,6 +42,12 @@ jobs:
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           repository-url: https://test.pypi.org/legacy/
+          # The staging publish must NOT generate attestations. With the default
+          # (attestations: true) the action writes *.publish.attestation files into
+          # dist/, and the subsequent production publish step then fails with "already
+          # have publish attestations". Attestations bind to one index/OIDC exchange,
+          # so generate them only on the final production publish below.
+          attestations: false
 
       - name: Verify staged release in clean environment
         env:

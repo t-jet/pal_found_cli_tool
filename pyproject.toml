@@ -52,6 +52,11 @@ namespaces = false
 [tool.setuptools_scm]
 fallback_version = "0.1.0"
 version_file = "src/pal_found_cli/_version.py"
+# Only tags that match the default version-tag regex (v?X.Y.Z) contribute to the
+# derived version. Without this, a non-semver tag on the same commit (e.g. the
+# qa-verify-20260929 tag co-located with v0.1.2) is parsed as a numeric version
+# and shadows the release tag, so the build publishes 20260929 instead of 0.1.2.
+tag.strict = true
 
 [tool.setuptools.package-data]
 "pal_found_cli.common" = ["metadata-allow-list.md"]
