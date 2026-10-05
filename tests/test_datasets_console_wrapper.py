@@ -153,6 +153,65 @@ async def test_file_list_pagination_uses_raw_response_data():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("resource", "operation"),
+    [
+        ("dataset", "get_schedules"),
+        ("dataset", "jobs"),
+        ("dataset", "transactions"),
+        ("branch", "list"),
+        ("branch", "transactions"),
+        ("file", "list"),
+    ],
+)
+async def test_paginated_operations_use_bounded_raw_pages_with_initial_cursor(
+    resource, operation
+):
+    command = operation.replace("_", "-")
+    args = pal_found_datasets_cli.build_parser().parse_args(
+        [resource, command, "dataset-rid", "--page-size", "3", "--page-token", "start"]
+    )
+    raw_method = AsyncMock(
+        side_effect=[
+            SimpleNamespace(
+                decode=lambda: SimpleNamespace(data=[], next_page_token="next")
+            ),
+            SimpleNamespace(
+                decode=lambda: SimpleNamespace(
+                    data=[{"rid": "record-1"}], next_page_token="later"
+                )
+            ),
+        ]
+    )
+    public_method = Mock(side_effect=AssertionError("SDK iterator must not be awaited"))
+    client = SimpleNamespace(
+        **{
+            operation: public_method,
+            "with_raw_response": SimpleNamespace(**{operation: raw_method}),
+        }
+    )
+    helper = pal_found_datasets_cli.PaginationHelper(
+        page_size=args.page_size, page_token=args.page_token, batch_pages=2
+    )
+
+    result = await pal_found_datasets_cli._invoke_paginated(
+        resource, operation, client, args, 30, helper
+    )
+
+    assert result == [{"rid": "record-1"}]
+    assert helper.pages_fetched == 2
+    assert helper.total_items == 1
+    assert helper.next_page_token == "later"
+    assert raw_method.await_count == 2
+    assert [call.kwargs["page_token"] for call in raw_method.await_args_list] == [
+        "start",
+        "next",
+    ]
+    assert all(call.kwargs["page_size"] == 3 for call in raw_method.await_args_list)
+    public_method.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_file_content_streams_bounded_download(monkeypatch, capsys):
     async def chunks():
         yield b"abc"
