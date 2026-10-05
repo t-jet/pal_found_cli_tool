@@ -69,3 +69,47 @@ async def test_packaged_main_success(monkeypatch, capsys):
     assert rc == pal_found_functions_cli.EXIT_SUCCESS
     assert "rid" in capsys.readouterr().out
 
+
+@pytest.mark.asyncio
+async def test_streaming_query_preserves_ndjson_content(monkeypatch, capsys):
+    ndjson = b'{"data":[1]}\n{"error":{"message":"partial failure"}}\n'
+
+    class Cfg:
+        timeout_s = 30
+        log_level = "INFO"
+
+        def load(self):
+            return None
+
+    class Factory:
+        def invocation_scope(self, cfg):
+            class Scope:
+                def __enter__(self):
+                    return None
+
+                def __exit__(self, exc_type, exc, tb):
+                    return False
+
+            return Scope()
+
+    retry = MagicMock()
+    retry.execute = AsyncMock(return_value=ndjson)
+    monkeypatch.setattr(pal_found_functions_cli, "ConfigLoader", Cfg)
+    monkeypatch.setattr(pal_found_functions_cli, "LogSetup", MagicMock())
+    monkeypatch.setattr(
+        pal_found_functions_cli,
+        "AccessControlGuard",
+        lambda cfg, ns: MagicMock(),
+    )
+    monkeypatch.setattr(pal_found_functions_cli, "AsyncClientFactory", Factory)
+    monkeypatch.setattr(pal_found_functions_cli, "_get_client", lambda *args: MagicMock())
+    monkeypatch.setattr(pal_found_functions_cli, "RetryHandler", lambda: retry)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["prog", "query", "streaming-execute", "orders", "--parameters", "{}"],
+    )
+
+    assert await pal_found_functions_cli.main() == pal_found_functions_cli.EXIT_SUCCESS
+    assert capsys.readouterr().out == ndjson.decode("utf-8")
+

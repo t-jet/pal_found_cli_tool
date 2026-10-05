@@ -29,6 +29,10 @@ from pal_found_cli.common.access_control_guard import (
     AccessControlGuard,
 )
 from pal_found_cli.common.async_client_factory import AsyncClientFactory
+from pal_found_cli.common.binary_download_handler import (
+    BinaryDownloadHandler,
+    DownloadError,
+)
 from pal_found_cli.common.config_loader import ConfigLoader
 from pal_found_cli.common.error_serializer import (
     EXIT_ACCESS_CONTROL,
@@ -177,14 +181,32 @@ async def _invoke(
                 dataset_rid=dr, branch_name=bn, request_timeout=timeout
             )
         if operation == "get_schema_batch":
-            rids_arg = getattr(args, "dataset_rids", None)
-            rids = json.loads(rids_arg) if isinstance(rids_arg, str) else rids_arg
-            return await client.get_schema_batch(
-                dataset_rids=rids, request_timeout=timeout
-            )
+            body = json.loads(args.body_json)
+            if (
+                not isinstance(body, list)
+                or not 1 <= len(body) <= 1000
+                or not all(
+                    isinstance(item, dict) and isinstance(item.get("datasetRid"), str)
+                    for item in body
+                )
+            ):
+                raise ValueError(
+                    "--body-json must contain 1-1000 objects with datasetRid"
+                )
+            return await client.get_schema_batch(body, request_timeout=timeout)
         if operation == "jobs":
+            order_by = json.loads(args.order_by_json)
+            if not isinstance(order_by, list) or not all(
+                isinstance(item, dict) for item in order_by
+            ):
+                raise ValueError("--order-by-json must be a JSON array of sort objects")
             return await client.jobs(
-                dataset_rid=dr, page_size=ps, page_token=pt, request_timeout=timeout
+                dataset_rid=dr,
+                order_by=order_by,
+                branch_name=bn,
+                page_size=ps,
+                page_token=pt,
+                request_timeout=timeout,
             )
         if operation == "put_schema":
             schema_arg = getattr(args, "schema", None)
@@ -193,14 +215,6 @@ async def _invoke(
             )
             return await client.put_schema(
                 dataset_rid=dr, schema=schema, branch_name=bn, request_timeout=timeout
-            )
-        if operation == "read_table":
-            return await client.read_table(
-                dataset_rid=dr,
-                branch_name=bn,
-                page_size=ps,
-                page_token=pt,
-                request_timeout=timeout,
             )
         if operation == "transactions":
             return await client.transactions(
@@ -232,15 +246,6 @@ async def _invoke(
                 request_timeout=timeout,
             )
     elif resource == "file":
-        if operation == "content":
-            return await client.content(
-                dataset_rid=dr,
-                file_path=fp,
-                branch_name=bn,
-                end_transaction_rid=getattr(args, "end_transaction_rid", None),
-                start_transaction_rid=getattr(args, "start_transaction_rid", None),
-                request_timeout=timeout,
-            )
         if operation == "delete":
             return await client.delete(
                 dataset_rid=dr,
@@ -252,15 +257,20 @@ async def _invoke(
             return await client.get(
                 dataset_rid=dr,
                 file_path=fp,
-                transaction_rid=tr,
+                branch_name=bn,
+                end_transaction_rid=getattr(args, "end_transaction_rid", None),
+                start_transaction_rid=getattr(args, "start_transaction_rid", None),
                 request_timeout=timeout,
             )
         if operation == "list":
             return await client.list(
                 dataset_rid=dr,
-                transaction_rid=tr,
+                branch_name=bn,
+                end_transaction_rid=getattr(args, "end_transaction_rid", None),
                 page_size=ps,
                 page_token=pt,
+                path_prefix=getattr(args, "path_prefix", None),
+                start_transaction_rid=getattr(args, "start_transaction_rid", None),
                 request_timeout=timeout,
             )
         if operation == "upload":
@@ -271,7 +281,7 @@ async def _invoke(
             return await client.upload(
                 dataset_rid=dr,
                 file_path=fp,
-                content=data,
+                body=data,
                 transaction_rid=tr,
                 request_timeout=timeout,
             )
@@ -290,7 +300,10 @@ async def _invoke(
             )
         if operation == "create":
             return await client.create(
-                dataset_rid=dr, branch_name=bn, request_timeout=timeout
+                dataset_rid=dr,
+                transaction_type=args.transaction_type,
+                branch_name=bn,
+                request_timeout=timeout,
             )
         if operation == "get":
             return await client.get(
@@ -318,9 +331,11 @@ async def _invoke(
             )
         if operation == "create":
             return await client.create(
-                name=nm,
+                view_name=args.view_name,
                 parent_folder_rid=pfr,
                 backing_datasets=bd,
+                branch=br,
+                primary_key=pk,
                 request_timeout=timeout,
             )
         if operation == "get":
@@ -344,6 +359,70 @@ async def _invoke(
     raise ValueError(f"Unknown operation: {resource}.{operation}")
 
 
+async def _download_file_content(
+    client: Any,
+    args: argparse.Namespace,
+    timeout: int | None,
+    cfg: ConfigLoader,
+) -> dict[str, Any]:
+    """Stream Dataset file content into a bounded, atomic download."""
+    response_context = client.with_streaming_response.content(
+        dataset_rid=args.dataset_rid,
+        file_path=args.file_path,
+        branch_name=args.branch_name,
+        end_transaction_rid=args.end_transaction_rid,
+        start_transaction_rid=args.start_transaction_rid,
+        request_timeout=timeout,
+    )
+    async with response_context as response:
+        result = await BinaryDownloadHandler(config=cfg).save(
+            response.aiter_bytes(),
+            original_filename=args.output,
+            namespace="datasets",
+            operation="file.content",
+        )
+    return result.to_dict()
+
+
+async def _download_read_table(
+    client: Any,
+    args: argparse.Namespace,
+    timeout: int | None,
+    cfg: ConfigLoader,
+) -> dict[str, Any]:
+    """Stream a Dataset table export into a bounded, atomic download."""
+    columns = None
+    if args.columns_json is not None:
+        try:
+            columns = json.loads(args.columns_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError("--columns-json must be a JSON array of strings") from exc
+        if not isinstance(columns, list) or not all(
+            isinstance(column, str) for column in columns
+        ):
+            raise ValueError("--columns-json must be a JSON array of strings")
+
+    response_context = client.with_streaming_response.read_table(
+        dataset_rid=args.dataset_rid,
+        format=args.table_format,
+        branch_name=args.branch_name,
+        columns=columns,
+        end_transaction_rid=args.end_transaction_rid,
+        row_limit=args.row_limit,
+        start_transaction_rid=args.start_transaction_rid,
+        request_timeout=timeout,
+    )
+    async with response_context as response:
+        result = await BinaryDownloadHandler(config=cfg).save(
+            response.aiter_bytes(),
+            original_filename=args.output,
+            namespace="datasets",
+            operation="dataset.read_table",
+            mime_type="text/csv" if args.table_format == "CSV" else None,
+        )
+    return result.to_dict()
+
+
 # Operations that return a paginated response and accept page_size/page_token
 # (FR-PAG-3). For these, the CLI wraps the SDK call with PaginationHelper to
 # honour --page-size / --page-token / --batch-pages and emit metadata to stderr.
@@ -351,12 +430,10 @@ PAGINATED_OPS = frozenset(
     {
         ("dataset", "get_schedules"),
         ("dataset", "jobs"),
-        ("dataset", "read_table"),
         ("dataset", "transactions"),
         ("branch", "list"),
         ("branch", "transactions"),
         ("file", "list"),
-        ("transaction", "transactions"),
     }
 )
 
@@ -374,16 +451,14 @@ async def _invoke_paginated(
     timeout: int | None,
     helper: PaginationHelper,
 ) -> Any:
-    """Invoke a paginated SDK operation through PaginationHelper.
+    """Fetch actual SDK response pages and preserve their continuation tokens.
 
-    Builds a single-page callable that delegates to ``_invoke`` (which already
-    forwards page_size/page_token) and feeds it to ``helper.paginate`` so the
-    batch aggregation, max-cap enforcement, and token propagation behave per
-    FR-PAG-1/2/4/5. The helper's metadata is emitted to stderr by the caller.
-
-    The base pagination kwargs are extracted from the args namespace so they
-    are NOT doubly passed (the SDK call receives them inside ``_invoke``).
+    Ordinary SDK list methods return ``AsyncResourceIterator``, which cannot be
+    awaited and exposes no public page cursor. Raw response methods return one
+    decodable page, so the shared helper can honor CLI paging options.
     """
+
+    raw_client = client.with_raw_response
 
     async def _single_page(**page_kwargs: Any) -> Any:
         # Materialize a fresh namespace so page tokens from the helper override
@@ -393,7 +468,14 @@ async def _invoke_paginated(
             "page_size", getattr(args, "page_size", None)
         )
         paged_args.page_token = page_kwargs.get("page_token", None)
-        return await _invoke(resource, operation, client, paged_args, timeout)
+        raw_response = await _invoke(
+            resource, operation, raw_client, paged_args, timeout
+        )
+        page = raw_response.decode()
+        return {
+            "items": list(getattr(page, "data", None) or []),
+            "next_page_token": getattr(page, "next_page_token", None),
+        }
 
     return await helper.paginate(_single_page)
 
@@ -423,7 +505,7 @@ def _resolve(resource: str, op: str) -> str:
     return mapping.get(op, op.replace("-", "_"))
 
 
-def _common_parser() -> argparse.ArgumentParser:
+def _common_parser(*, paginated: bool = True) -> argparse.ArgumentParser:
     """Build the shared argparse parent with global options.
 
     Every leaf operation subparser inherits these arguments via ``parents``,
@@ -433,9 +515,10 @@ def _common_parser() -> argparse.ArgumentParser:
     common.add_argument("--timeout", type=int, default=None)
     common.add_argument("--format", choices=["json", "toon", "auto"], default="auto")
     common.add_argument("--pretty", action="store_true")
-    common.add_argument("--page-size", type=int, default=None, dest="page_size")
-    common.add_argument("--page-token", type=str, default=None, dest="page_token")
-    common.add_argument("--batch-pages", type=int, default=None, dest="batch_pages")
+    if paginated:
+        common.add_argument("--page-size", type=int, default=None, dest="page_size")
+        common.add_argument("--page-token", type=str, default=None, dest="page_token")
+        common.add_argument("--batch-pages", type=int, default=None, dest="batch_pages")
     return common
 
 
@@ -443,8 +526,11 @@ def _add_operation(
     subparsers: Any,
     name: str,
     *arguments: tuple[tuple[str, ...], dict[str, Any]],
+    paginated: bool = True,
 ) -> argparse.ArgumentParser:
-    operation_parser = subparsers.add_parser(name, parents=[_common_parser()])
+    operation_parser = subparsers.add_parser(
+        name, parents=[_common_parser(paginated=paginated)]
+    )
     for flags, kwargs in arguments:
         operation_parser.add_argument(*flags, **kwargs)
     return cast(argparse.ArgumentParser, operation_parser)
@@ -472,7 +558,6 @@ def build_parser() -> argparse.ArgumentParser:
         "get-health-checks",
         "get-schedules",
         "get-schema",
-        "read-table",
     ):
         _add_operation(
             ds_sub,
@@ -482,10 +567,41 @@ def build_parser() -> argparse.ArgumentParser:
         )
     _add_operation(
         ds_sub,
-        "get-schema-batch",
-        (("--dataset-r",), {"required": True, "dest": "dataset_rids"}),
+        "read-table",
+        (("dataset_rid",), {}),
+        (
+            ("--table-format",),
+            {"required": True, "choices": ("ARROW", "CSV"), "dest": "table_format"},
+        ),
+        (("--output",), {"default": None}),
+        (("--branch-name",), {"default": None, "dest": "branch_name"}),
+        (("--columns-json",), {"default": None, "dest": "columns_json"}),
+        (("--end-transaction-rid",), {"default": None, "dest": "end_transaction_rid"}),
+        (("--row-limit",), {"type": int, "default": None, "dest": "row_limit"}),
+        (
+            ("--start-transaction-rid",),
+            {"default": None, "dest": "start_transaction_rid"},
+        ),
+        paginated=False,
     )
-    _add_operation(ds_sub, "jobs", (("dataset_rid",), {}))
+    _add_operation(
+        ds_sub,
+        "get-schema-batch",
+        (("--body-json",), {"required": True, "dest": "body_json"}),
+    )
+    _add_operation(
+        ds_sub,
+        "jobs",
+        (("dataset_rid",), {}),
+        (
+            ("--order-by-json",),
+            {
+                "default": '[{"sortType":"BY_STARTED_TIME","sortDirection":"DESCENDING"}]',
+                "dest": "order_by_json",
+            },
+        ),
+        (("--branch-name",), {"default": None, "dest": "branch_name"}),
+    )
     _add_operation(
         ds_sub,
         "put-schema",
@@ -526,6 +642,7 @@ def build_parser() -> argparse.ArgumentParser:
         "content",
         (("dataset_rid",), {}),
         (("--file-path",), {"required": True, "dest": "file_path"}),
+        (("--output",), {"default": None}),
         (("--branch-name",), {"default": None, "dest": "branch_name"}),
         (("--end-transaction-rid",), {"default": None, "dest": "end_transaction_rid"}),
         (
@@ -533,7 +650,7 @@ def build_parser() -> argparse.ArgumentParser:
             {"default": None, "dest": "start_transaction_rid"},
         ),
     )
-    for operation_name in ("delete", "get", "upload"):
+    for operation_name in ("delete", "upload"):
         _add_operation(
             fl_sub,
             operation_name,
@@ -543,9 +660,27 @@ def build_parser() -> argparse.ArgumentParser:
         )
     _add_operation(
         fl_sub,
+        "get",
+        (("dataset_rid",), {}),
+        (("--file-path",), {"required": True, "dest": "file_path"}),
+        (("--branch-name",), {"default": None, "dest": "branch_name"}),
+        (("--end-transaction-rid",), {"default": None, "dest": "end_transaction_rid"}),
+        (
+            ("--start-transaction-rid",),
+            {"default": None, "dest": "start_transaction_rid"},
+        ),
+    )
+    _add_operation(
+        fl_sub,
         "list",
         (("dataset_rid",), {}),
-        (("--transaction-rid",), {"default": None, "dest": "transaction_rid"}),
+        (("--branch-name",), {"default": None, "dest": "branch_name"}),
+        (("--end-transaction-rid",), {"default": None, "dest": "end_transaction_rid"}),
+        (("--path-prefix",), {"default": None, "dest": "path_prefix"}),
+        (
+            ("--start-transaction-rid",),
+            {"default": None, "dest": "start_transaction_rid"},
+        ),
     )
 
     tx = subparsers.add_parser("transaction")
@@ -561,6 +696,7 @@ def build_parser() -> argparse.ArgumentParser:
         tx_sub,
         "create",
         (("dataset_rid",), {}),
+        (("--transaction-type",), {"required": True, "dest": "transaction_type"}),
         (("--branch-name",), {"default": None, "dest": "branch_name"}),
     )
 
@@ -588,9 +724,11 @@ def build_parser() -> argparse.ArgumentParser:
     _add_operation(
         vw_sub,
         "create",
-        (("--name",), {"required": True}),
+        (("--view-name",), {"required": True, "dest": "view_name"}),
         (("--parent-folder-rid",), {"required": True, "dest": "parent_folder_rid"}),
-        (("--backing-datasets",), {"default": None, "dest": "backing_datasets"}),
+        (("--backing-datasets",), {"required": True, "dest": "backing_datasets"}),
+        (("--branch",), {"default": None}),
+        (("--primary-key",), {"default": None, "dest": "primary_key"}),
     )
     _add_operation(
         vw_sub,
@@ -668,7 +806,15 @@ async def async_main() -> int:
 
     # Invoke operation
     try:
-        if helper is not None:
+        if resource == "file" and operation == "content":
+            result = await retry_handler.execute(
+                _download_file_content, client, args, timeout, cfg
+            )
+        elif resource == "dataset" and operation == "read_table":
+            result = await retry_handler.execute(
+                _download_read_table, client, args, timeout, cfg
+            )
+        elif helper is not None:
             result = await retry_handler.execute(
                 _invoke_paginated,
                 resource,
@@ -705,6 +851,12 @@ async def async_main() -> int:
         serializer = ErrorSerializer()
         serializer.serialize(exc)
         return EXIT_NOT_FOUND
+    except DownloadError as exc:
+        serializer = ErrorSerializer()
+        return serializer.serialize(exc)
+    except ValueError as exc:
+        serializer = ErrorSerializer()
+        return serializer.serialize(exc)
     except TimeoutError as exc:
         serializer = ErrorSerializer()
         serializer.serialize(exc)

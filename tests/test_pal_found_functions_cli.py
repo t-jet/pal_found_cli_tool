@@ -302,7 +302,7 @@ async def test_main_returns_adr_001_exit_codes(monkeypatch, exc, exit_code):
 
 
 @pytest.mark.asyncio
-async def test_main_streaming_bytes_output_is_length_envelope(monkeypatch, capsys):
+async def test_main_streaming_bytes_output_preserves_payload(monkeypatch, capsys):
     sdk = MagicMock()
     sdk.functions.Query.streaming_execute = AsyncMock(return_value=b"abc")
     factory = _ScopeFactory(sdk)
@@ -330,5 +330,5 @@ async def test_main_streaming_bytes_output_is_length_envelope(monkeypatch, capsy
     rc = await pal_found_functions_cli.main()
 
     assert rc == pal_found_functions_cli.EXIT_SUCCESS
-    assert json.loads(capsys.readouterr().out) == {"bytes": 3}
+    assert capsys.readouterr().out == "abc"
 

@@ -350,6 +350,11 @@ async def main() -> int:
                 args,
                 timeout,
             )
+        if (resource, operation) == ("query", "streaming_execute"):
+            # The SDK returns UTF-8 NDJSON. Preserve data and error lines as
+            # returned; JSON/TOON formatting would turn the bytes into a count.
+            sys.stdout.write(result.decode("utf-8"))
+            return EXIT_SUCCESS
         formatter = OutputFormatter(
             format_setting=getattr(args, "format", "auto"),
             pretty=getattr(args, "pretty", False),
