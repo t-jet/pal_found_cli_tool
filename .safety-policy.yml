@@ -1,0 +1,20 @@
+# Safety policy for the CI dependency scan (`safety check`).
+#
+# The scan runs against the CI environment, which contains the scanner plus
+# its own dependencies. Every suppression here is reviewed and time-bound.
+security:
+  # Keep the scan blocking: a non-suppressed vulnerability still fails CI.
+  continue-on-vulnerability-error: False
+  ignore-vulnerabilities:
+    # nltk is pulled in by the safety scanner (safety 3.8.1 requires
+    # nltk>=3.9), not by pal_found_cli itself. No fixed release exists
+    # above 3.10.3 on PyPI, so the finding cannot be remediated by an
+    # upgrade. Advisory: SFTY-20260902-58666 / CVE-2026-81726 (path
+    # traversal). Remove this entry once a fixed nltk release is available
+    # or safety drops the nltk dependency.
+    SFTY-20260902-58666:
+      reason: >-
+        Path traversal (CVE-2026-81726) in nltk, which the safety scanner
+        pulls transitively. nltk is not a pal_found_cli dependency and no
+        fixed release exists above 3.10.3. Remove when a fix ships.
+      expires: "2027-01-09"
