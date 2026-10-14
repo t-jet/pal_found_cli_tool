@@ -17,6 +17,7 @@ import os
 import sys
 from typing import Any
 
+from pal_found_cli.common.error_serializer import EXIT_SERVER_ERROR
 from pal_found_cli.common.log_setup import METADATA_SEPARATOR
 
 # Default values (from SRS-001 §5)
@@ -28,6 +29,12 @@ MAX_BATCH_PAGES = min(
     ),
     HARD_MAX_BATCH_PAGES,
 )
+
+
+class PaginationBoundaryError(RuntimeError):
+    """The SDK iterator does not expose a safe page boundary."""
+
+    exit_code = EXIT_SERVER_ERROR
 
 
 class PaginationHelper:
@@ -68,6 +75,7 @@ class PaginationHelper:
         self._next_page_token: str | None = None
         self._total_items: int = 0
         self._pages_fetched: int = 0
+        self._response_metadata: list[dict[str, Any]] = []
 
     @staticmethod
     def _validate_positive_int(name: str, value: int) -> int:
@@ -107,6 +115,13 @@ class PaginationHelper:
         if self.page_token is not None:
             params["page_token"] = self.page_token
         return params
+
+    def reset_progress(self) -> None:
+        """Discard counters from a failed batch before a retry."""
+        self._next_page_token = None
+        self._total_items = 0
+        self._pages_fetched = 0
+        self._response_metadata.clear()
 
     def _extract_items(self, response: Any) -> list[Any]:
         """Extract items list from SDK response.
@@ -185,6 +200,8 @@ class PaginationHelper:
             all_items.extend(items)
             self._total_items += len(items)
             self._pages_fetched += 1
+            if isinstance(response, dict) and isinstance(response.get("page_metadata"), dict):
+                self._response_metadata.append(response["page_metadata"])
 
             token = self._extract_next_token(response)
             if token is None:
@@ -206,6 +223,8 @@ class PaginationHelper:
             metadata["next_page_token"] = self._next_page_token
         if self.page_size:
             metadata["page_size"] = self.page_size
+        if self._response_metadata:
+            metadata["response_metadata"] = self._response_metadata
 
         sys.stderr.write(METADATA_SEPARATOR + "\n")
         sys.stderr.write(json.dumps(metadata) + "\n")

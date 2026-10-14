@@ -8,13 +8,19 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from foundry_sdk.v2.admin import models as admin_models
 
 _SRC = Path(__file__).parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
 from pal_found_cli.admin.scripts import pal_found_admin_cli
-from pal_found_cli.common.error_serializer import EXIT_AUTH, EXIT_CONFIGURATION
+from pal_found_cli.common.error_serializer import (
+    EXIT_AUTH,
+    EXIT_CONFIGURATION,
+    EXIT_SERVER_ERROR,
+    EXIT_USER_INPUT,
+)
 
 
 def _ns(**kwargs):
@@ -96,24 +102,41 @@ class _ScopeFactory:
 
 
 class _AsyncResourceIteratorDouble:
-    def __init__(self, items, next_page_token=None):
-        self.items = list(items)
-        self.index = 0
-        self._page_iterator = self
-        self._next_page_token = next_page_token
+    def __init__(self, pages, tokens):
+        self._page_iterator = _AsyncPageIteratorDouble(pages, tokens)
+        self._items = []
+        self._index = 0
 
     def __aiter__(self):
         return self
 
     async def __anext__(self):
-        if self.index >= len(self.items):
-            raise StopAsyncIteration
-        item = self.items[self.index]
-        self.index += 1
+        while self._index >= len(self._items):
+            self._items = await self._page_iterator.__anext__()
+            self._index = 0
+        item = self._items[self._index]
+        self._index += 1
         return item
 
+
+class _AsyncPageIteratorDouble:
+    def __init__(self, pages, tokens):
+        assert len(pages) == len(tokens)
+        self.pages = pages
+        self.tokens = tokens
+        self.index = 0
+        self.next_page_token = None
+
+    async def __anext__(self):
+        if self.index >= len(self.pages):
+            raise StopAsyncIteration
+        page = self.pages[self.index]
+        self.next_page_token = self.tokens[self.index]
+        self.index += 1
+        return page
+
     async def get_next_page_token(self):
-        return self._next_page_token
+        return self.next_page_token
 
 
 class _HttpError(Exception):
@@ -298,8 +321,8 @@ async def test_invoke_paginated_uses_helper_for_all_paginated_ops(resource, oper
     method_name = pal_found_admin_cli._spec_for(resource, operation)["method"]
     method = MagicMock(
         return_value=_AsyncResourceIteratorDouble(
-            [{"id": 1}, {"id": 2}, {"id": 3}],
-            next_page_token="next",
+            [[{"id": 1}], [{"id": 2}], [{"id": 3}]],
+            ["second", "next", None],
         )
     )
     setattr(client, method_name, method)
@@ -344,13 +367,133 @@ async def test_invoke_paginated_falls_back_to_page_envelopes():
     assert client.search.call_args_list[1].kwargs["page_token"] == "next"
 
 
+@pytest.mark.parametrize(
+    "resource,response_type",
+    [
+        ("group", admin_models.SearchGroupsResponse),
+        ("user", admin_models.SearchUsersResponse),
+    ],
+)
+@pytest.mark.parametrize(
+    "batch_pages,expected_ids,expected_token",
+    [
+        (1, ["a", "b"], "page-2"),
+        (2, ["a", "b", "c"], None),
+    ],
+)
+@pytest.mark.asyncio
+async def test_admin_search_collects_sdk_response_data(
+    resource, response_type, batch_pages, expected_ids, expected_token
+):
+    client = MagicMock()
+    client.search = AsyncMock(
+        side_effect=[
+            response_type.model_construct(
+                data=[{"id": "a"}, {"id": "b"}], next_page_token="page-2"
+            ),
+            response_type.model_construct(data=[{"id": "c"}], next_page_token=None),
+        ]
+    )
+    helper = pal_found_admin_cli.PaginationHelper(page_size=2, batch_pages=batch_pages)
+
+    result = await pal_found_admin_cli._invoke_paginated(
+        resource, "search", client, _ns(where="{}", page_size=2), 3, helper
+    )
+
+    assert [item["id"] for item in result] == expected_ids
+    assert helper.pages_fetched == batch_pages
+    assert helper.total_items == len(expected_ids)
+    assert helper.next_page_token == expected_token
+    assert client.search.await_count == batch_pages
+    if batch_pages == 2:
+        assert client.search.call_args_list[1].kwargs["page_token"] == "page-2"
+
+
+@pytest.mark.asyncio
+async def test_paginated_retry_reports_only_successful_batch():
+    client = MagicMock()
+    first = {"items": [{"id": 1}], "next_page_token": "next"}
+    second = {"items": [{"id": 2}]}
+    client.search = AsyncMock(
+        side_effect=[first, ConnectionError("transient"), first, second]
+    )
+    helper = pal_found_admin_cli.PaginationHelper(page_size=1, batch_pages=2)
+    args = _ns(where="{}", page_size=1)
+
+    with pytest.raises(ConnectionError):
+        await pal_found_admin_cli._invoke_paginated(
+            "user", "search", client, args, 3, helper
+        )
+    result = await pal_found_admin_cli._invoke_paginated(
+        "user", "search", client, args, 3, helper
+    )
+
+    assert result == [{"id": 1}, {"id": 2}]
+    assert helper.pages_fetched == 2
+    assert helper.total_items == 2
+    assert helper.next_page_token is None
+
+
+@pytest.mark.parametrize(
+    "pages,tokens,batch_pages,expected,expected_token",
+    [
+        ([[{"id": 0}, {"id": 1}, {"id": 2}]], ["next"], 1, [0, 1, 2], "next"),
+        ([[{"id": 0}], [{"id": 1}]], ["second", None], 2, [0, 1], None),
+        ([[], [{"id": 1}]], ["second", None], 2, [1], None),
+        ([[]], [None], 2, [], None),
+    ],
+)
+@pytest.mark.asyncio
+async def test_async_iterator_counts_complete_pages(
+    pages, tokens, batch_pages, expected, expected_token
+):
+    client = MagicMock()
+    client.search = MagicMock(return_value=_AsyncResourceIteratorDouble(pages, tokens))
+    helper = pal_found_admin_cli.PaginationHelper(page_size=2, batch_pages=batch_pages)
+
+    result = await pal_found_admin_cli._invoke_paginated(
+        "user", "search", client, _ns(where="{}", page_size=2), 3, helper
+    )
+
+    assert [item["id"] for item in result] == expected
+    assert helper.pages_fetched == len(pages)
+    assert helper.total_items == len(expected)
+    assert helper.next_page_token == expected_token
+    client.search.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_async_iterator_continuation_keeps_oversized_page_items():
+    client = MagicMock()
+    client.search = MagicMock(
+        side_effect=[
+            _AsyncResourceIteratorDouble([[{"id": 0}, {"id": 1}, {"id": 2}]], ["next"]),
+            _AsyncResourceIteratorDouble([[{"id": 3}]], [None]),
+        ]
+    )
+    first = pal_found_admin_cli.PaginationHelper(page_size=2, batch_pages=1)
+    initial = await pal_found_admin_cli._invoke_paginated(
+        "user", "search", client, _ns(where="{}", page_size=2), 3, first
+    )
+    resumed = pal_found_admin_cli.PaginationHelper(
+        page_size=2, page_token=first.next_page_token, batch_pages=1
+    )
+    remainder = await pal_found_admin_cli._invoke_paginated(
+        "user", "search", client, _ns(where="{}", page_size=2), 3, resumed
+    )
+
+    assert [item["id"] for item in initial + remainder] == [0, 1, 2, 3]
+    assert client.search.call_args_list[1].kwargs["page_token"] == "next"
+    assert resumed.next_page_token is None
+
+
 @pytest.mark.asyncio
 async def test_main_paginated_operation_emits_next_page_token(monkeypatch, capsys):
     sdk = MagicMock()
     sdk.admin.Group.list = MagicMock(
         return_value=_AsyncResourceIteratorDouble(
-            [{"rid": "one"}],
-            next_page_token="next",
+            [[{"rid": "one"}]],
+            ["next"],
         )
     )
     factory = _ScopeFactory(sdk)
@@ -433,9 +576,16 @@ async def test_main_acl_denied_returns_exit_8_and_skips_sdk(monkeypatch):
             pal_found_admin_cli.EXIT_ACCESS_CONTROL,
         ),
         (EnvironmentError("bad config"), EXIT_CONFIGURATION),
+        (OSError(11, "resource temporarily unavailable"), EXIT_CONFIGURATION),
+        (OSError(115, "operation in progress"), EXIT_CONFIGURATION),
+        (TypeError("invalid argument"), EXIT_USER_INPUT),
+        (
+            pal_found_admin_cli.PaginationBoundaryError("page unavailable"),
+            EXIT_SERVER_ERROR,
+        ),
     ],
 )
-async def test_main_returns_adr_001_exit_codes(monkeypatch, exc, exit_code):
+async def test_main_returns_adr_001_exit_codes(monkeypatch, capsys, exc, exit_code):
     sdk = MagicMock()
     sdk.admin.User = MagicMock()
     factory = _ScopeFactory(sdk)
@@ -453,6 +603,8 @@ async def test_main_returns_adr_001_exit_codes(monkeypatch, exc, exit_code):
     rc = await pal_found_admin_cli.main()
 
     assert rc == exit_code
+    envelope = json.loads(capsys.readouterr().out)
+    assert envelope["exit_code"] == exit_code
 
 
 @pytest.mark.asyncio

@@ -179,6 +179,55 @@ class TestBatchAggregation:
         assert len(items) == MAX_BATCH_PAGES
         assert helper.next_page_token == f"tok{MAX_BATCH_PAGES}"
 
+    @pytest.mark.asyncio
+    async def test_retry_discards_failed_batch_progress(self, capsys):
+        """A retry reports only pages and items from its successful attempt."""
+        helper = PaginationHelper(page_size=1, batch_pages=2)
+        calls = 0
+
+        async def flaky(**kw):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise ConnectionError("transient page failure")
+            token = kw.get("page_token")
+            return {
+                "items": [token or "first"],
+                "next_page_token": "second" if token is None else None,
+            }
+
+        with pytest.raises(ConnectionError):
+            await helper.paginate(flaky)
+
+        helper.reset_progress()
+        assert await helper.paginate(flaky) == ["first", "second"]
+        helper.emit_metadata()
+        payload = json.loads(capsys.readouterr().err.strip().splitlines()[-1])
+        assert payload["pages_fetched"] == 2
+        assert payload["total_items"] == 2
+        assert "next_page_token" not in payload
+
+    @pytest.mark.asyncio
+    async def test_response_metadata_preserves_page_order(self, capsys):
+        """Per-page SDK fields remain ordered alongside aggregated items."""
+        helper = PaginationHelper(batch_pages=2)
+
+        async def page(**kw):
+            token = kw.get("page_token")
+            return {
+                "items": [token or "first"],
+                "next_page_token": "second" if token is None else None,
+                "page_metadata": {"transaction_id": token or "first"},
+            }
+
+        assert await helper.paginate(page) == ["first", "second"]
+        helper.emit_metadata()
+        payload = json.loads(capsys.readouterr().err.strip().splitlines()[-1])
+        assert payload["response_metadata"] == [
+            {"transaction_id": "first"},
+            {"transaction_id": "second"},
+        ]
+
 
 class TestPageSizeValidation:
     """PaginationHelper rejects invalid page sizes."""

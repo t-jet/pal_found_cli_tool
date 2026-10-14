@@ -8,7 +8,6 @@ import asyncio
 import inspect
 import json
 import logging
-import math
 import sys
 from collections.abc import Iterable
 from pathlib import Path
@@ -39,7 +38,6 @@ from pal_found_cli.common.error_serializer import (
     EXIT_ACCESS_CONTROL,
     EXIT_NOT_FOUND,
     EXIT_PERMISSION_DENIED,
-    EXIT_RATE_LIMIT,
     EXIT_SERVER_ERROR,
     EXIT_SUCCESS,
     EXIT_TIMEOUT,
@@ -48,7 +46,7 @@ from pal_found_cli.common.error_serializer import (
 )
 from pal_found_cli.common.log_setup import LogSetup
 from pal_found_cli.common.output_formatter import OutputFormatter
-from pal_found_cli.common.pagination_helper import PaginationHelper
+from pal_found_cli.common.pagination_helper import PaginationBoundaryError, PaginationHelper
 from pal_found_cli.common.retry import RetryHandler
 
 logger = logging.getLogger(__name__)
@@ -461,18 +459,25 @@ async def _read_next_page_token(iterator: Any) -> str | None:
 
 
 async def _collect_async_iterator(iterator: Any, helper: PaginationHelper) -> list[Any]:
-    """Collect items from a Foundry SDK AsyncResourceIterator."""
+    """Collect complete SDK pages so a continuation never skips page items."""
+    page_iterator = getattr(iterator, "_page_iterator", None)
+    if page_iterator is None or not hasattr(page_iterator, "__anext__"):
+        raise PaginationBoundaryError("SDK async iterator does not expose page boundaries")
+
     items: list[Any] = []
-    item_limit = helper.page_size * helper.batch_pages
-
-    async for item in iterator:
-        items.append(item)
-        if len(items) >= item_limit:
+    token: str | None = None
+    for _ in range(helper.batch_pages):
+        try:
+            page = await page_iterator.__anext__()
+        except StopAsyncIteration:
             break
-
+        items.extend(page)
+        helper._pages_fetched += 1
+        token = await _read_next_page_token(iterator)
+        if token is None:
+            break
     helper._total_items += len(items)
-    helper._pages_fetched += max(1, math.ceil(len(items) / helper.page_size))
-    helper._next_page_token = await _read_next_page_token(iterator)
+    helper._next_page_token = token
     return items
 
 
@@ -538,6 +543,7 @@ async def _invoke_paginated(
     helper: PaginationHelper,
 ) -> Any:
     """Invoke a paginated filesystem operation."""
+    helper.reset_progress()
 
     async def _single_page(**page_kwargs: Any) -> Any:
         paged_args = argparse.Namespace(**vars(args))
@@ -639,15 +645,9 @@ async def main() -> int:
         ErrorSerializer().serialize(exc)
         return EXIT_USER_INPUT
     except OSError as exc:
-        exit_code = ErrorSerializer().serialize(exc)
-        if getattr(exc, "errno", None) in (11, 115):
-            return EXIT_RATE_LIMIT
-        return exit_code
+        return ErrorSerializer().serialize(exc)
     except Exception as exc:
-        exit_code = ErrorSerializer().serialize(exc)
-        if exit_code != EXIT_USER_INPUT:
-            return exit_code
-        return EXIT_SERVER_ERROR
+        return ErrorSerializer().serialize(exc)
 
 
 def console_main() -> int:

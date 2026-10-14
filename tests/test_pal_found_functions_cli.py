@@ -34,7 +34,7 @@ def _value_for(name):
     if name == "parameters":
         return '{"p": 1}'
     if name == "attribution":
-        return '{"source": "unit-test"}'
+        return "unit-test"
     if name == "body":
         return '[{"rid": "ri.function.main"}]'
     if name in {"include_prerelease", "preview"}:
@@ -167,7 +167,7 @@ async def test_invoke_parses_json_and_boolean_args():
     args = _ns(
         query_api_name="query",
         parameters='{"x": 2}',
-        attribution='{"service": "cli"}',
+        attribution="my-app",
         preview=True,
     )
 
@@ -176,7 +176,7 @@ async def test_invoke_parses_json_and_boolean_args():
     client.execute.assert_awaited_once_with(
         "query",
         parameters={"x": 2},
-        attribution={"service": "cli"},
+        attribution="my-app",
         preview=True,
         request_timeout=7,
     )

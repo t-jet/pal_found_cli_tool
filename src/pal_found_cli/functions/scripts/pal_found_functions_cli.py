@@ -95,7 +95,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "transaction_id",
             "version",
         ),
-        json_args=("parameters", "attribution"),
+        json_args=("parameters",),
     ),
     _op(
         "query",
@@ -139,7 +139,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "transaction_id",
             "version",
         ),
-        json_args=("parameters", "attribution"),
+        json_args=("parameters",),
     ),
     _op("value_type", "get", "ValueType", "get", ("value_type_rid",), optional=("preview",)),
     _op(

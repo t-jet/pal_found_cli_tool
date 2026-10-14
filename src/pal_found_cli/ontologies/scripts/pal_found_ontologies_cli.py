@@ -40,7 +40,6 @@ from pal_found_cli.common.error_serializer import (
     EXIT_NOT_FOUND,
     EXIT_PERMISSION_DENIED,
     EXIT_RATE_LIMIT,
-    EXIT_SERVER_ERROR,
     EXIT_SUCCESS,
     EXIT_TIMEOUT,
     EXIT_USER_INPUT,
@@ -48,7 +47,7 @@ from pal_found_cli.common.error_serializer import (
 )
 from pal_found_cli.common.log_setup import LogSetup
 from pal_found_cli.common.output_formatter import OutputFormatter
-from pal_found_cli.common.pagination_helper import PaginationHelper
+from pal_found_cli.common.pagination_helper import PaginationBoundaryError, PaginationHelper
 from pal_found_cli.common.retry import RetryHandler
 
 logger = logging.getLogger(__name__)
@@ -66,6 +65,7 @@ def _op(
     optional: Iterable[str] = (),
     *,
     json_args: Iterable[str] = (),
+    required: Iterable[str] = (),
     binary_download: bool = False,
     binary_upload: bool = False,
 ) -> OperationSpec:
@@ -77,6 +77,7 @@ def _op(
         "positional": tuple(positional),
         "optional": tuple(optional),
         "json_args": frozenset(json_args),
+        "required": frozenset(required),
         "binary_download": binary_download,
         "binary_upload": binary_upload,
     }
@@ -98,6 +99,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "transaction_id",
         ),
         json_args=("parameters", "options"),
+        required=("parameters",),
     ),
     _op(
         "action",
@@ -107,6 +109,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
         ("ontology", "action"),
         ("requests", "branch", "options", "sdk_package_rid", "sdk_version"),
         json_args=("requests", "options"),
+        required=("requests",),
     ),
     _op(
         "action",
@@ -123,6 +126,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "transaction_id",
         ),
         json_args=("overrides", "request"),
+        required=("overrides", "request"),
     ),
     _op(
         "action_type",
@@ -148,6 +152,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
         ("ontology",),
         ("requests", "branch"),
         json_args=("requests",),
+        required=("requests",),
     ),
     _op(
         "action_type",
@@ -336,6 +341,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
         ("ontology",),
         ("requests", "branch"),
         json_args=("requests",),
+        required=("requests",),
     ),
     _op(
         "object_type",
@@ -352,7 +358,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "page_token",
             "sort_order",
         ),
-        json_args=("filters",),
+        json_args=("filters", "object_primary_key"),
     ),
     _op(
         "object_type",
@@ -418,6 +424,13 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "object_types",
             "query_types",
         ),
+        required=(
+            "action_types",
+            "interface_types",
+            "link_types",
+            "object_types",
+            "query_types",
+        ),
     ),
     _op(
         "ontology_interface",
@@ -427,6 +440,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
         ("ontology", "interface_type"),
         ("aggregation", "group_by", "accuracy", "branch", "preview", "where"),
         json_args=("aggregation", "group_by", "where"),
+        required=("aggregation", "group_by"),
     ),
     _op(
         "ontology_interface",
@@ -534,6 +548,15 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "order_by",
             "where",
         ),
+        required=(
+            "augmented_interface_property_types",
+            "augmented_properties",
+            "augmented_shared_property_types",
+            "other_interface_types",
+            "selected_interface_property_types",
+            "selected_object_types",
+            "selected_shared_property_types",
+        ),
     ),
     _op(
         "ontology_object",
@@ -551,6 +574,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "where",
         ),
         json_args=("aggregation", "group_by", "where"),
+        required=("aggregation", "group_by"),
     ),
     _op(
         "ontology_object",
@@ -608,6 +632,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "where",
         ),
         json_args=("select", "order_by", "select_v2", "where"),
+        required=("select",),
     ),
     _op(
         "ontology_object_set",
@@ -627,6 +652,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "transaction_id",
         ),
         json_args=("aggregation", "group_by", "object_set"),
+        required=("aggregation", "group_by", "object_set"),
     ),
     _op(
         "ontology_object_set",
@@ -636,6 +662,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
         ("ontology",),
         ("object_set", "branch", "sdk_package_rid", "sdk_version"),
         json_args=("object_set",),
+        required=("object_set",),
     ),
     _op(
         "ontology_object_set",
@@ -667,6 +694,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "transaction_id",
         ),
         json_args=("object_set", "select", "order_by", "select_v2"),
+        required=("object_set", "select"),
     ),
     _op(
         "ontology_object_set",
@@ -685,6 +713,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "sdk_version",
         ),
         json_args=("links", "object_set"),
+        required=("links", "object_set"),
     ),
     _op(
         "ontology_object_set",
@@ -710,6 +739,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "transaction_id",
         ),
         json_args=("object_set", "select", "order_by", "select_v2"),
+        required=("object_set", "select"),
     ),
     _op(
         "ontology_object_set",
@@ -733,6 +763,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "transaction_id",
         ),
         json_args=("object_set", "select", "order_by", "select_v2"),
+        required=("object_set", "select"),
     ),
     _op(
         "ontology_transaction",
@@ -742,6 +773,7 @@ OP_SPECS: tuple[OperationSpec, ...] = (
         ("ontology", "transaction_id"),
         ("edits", "preview", "sdk_package_rid", "sdk_version"),
         json_args=("edits",),
+        required=("edits",),
     ),
     _op(
         "ontology_value_type",
@@ -774,7 +806,8 @@ OP_SPECS: tuple[OperationSpec, ...] = (
             "transaction_id",
             "version",
         ),
-        json_args=("parameters", "attribution"),
+        json_args=("parameters",),
+        required=("parameters",),
     ),
     _op(
         "query_type",
@@ -901,6 +934,16 @@ def _common_parser() -> argparse.ArgumentParser:
     return common
 
 
+class _RequiredInputParser(argparse.ArgumentParser):
+    """Report missing required flags through the CLI input-error taxonomy."""
+
+    def error(self, message: str) -> None:
+        if message.startswith("the following arguments are required:") and "--" in message:
+            ErrorSerializer().serialize(ValueError(message))
+            self.exit(EXIT_USER_INPUT)
+        super().error(message)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build argparse parser with all 67 ontology operations."""
     parser = argparse.ArgumentParser(
@@ -911,7 +954,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     for resource in sorted(OPERATION_BY_RESOURCE):
         res_parser = subparsers.add_parser(_kebab(resource))
-        op_sub = res_parser.add_subparsers(dest="operation")
+        op_sub = res_parser.add_subparsers(
+            dest="operation", parser_class=_RequiredInputParser
+        )
         for operation, spec in sorted(OPERATION_BY_RESOURCE[resource].items()):
             op_parser = op_sub.add_parser(_kebab(operation), parents=[_common_parser()])
             for arg_name in spec["positional"]:
@@ -941,7 +986,12 @@ def build_parser() -> argparse.ArgumentParser:
                         flag, action="store_true", default=None, dest=arg_name
                     )
                 else:
-                    op_parser.add_argument(flag, default=None, dest=arg_name)
+                    op_parser.add_argument(
+                        flag,
+                        default=None,
+                        dest=arg_name,
+                        required=arg_name in spec["required"],
+                    )
 
     return parser
 
@@ -1091,6 +1141,66 @@ PAGINATED_OPS = frozenset(
     if "page_size" in spec["optional"] and "page_token" in spec["optional"]
 )
 
+# These SDK methods return AsyncResourceIterator, which fetches further pages
+# during iteration. Use its raw response client to keep CLI page bounds exact.
+ITERATOR_PAGINATED_OPS = frozenset(
+    {
+        ("action_type", "list"),
+        ("action_type_full_metadata", "list"),
+        ("linked_object", "list_linked_objects"),
+        ("object_type", "list"),
+        ("object_type", "list_outgoing_link_types"),
+        ("ontology_interface", "list"),
+        ("ontology_interface", "list_interface_linked_objects"),
+        ("ontology_interface", "list_objects_for_interface"),
+        ("ontology_object", "list"),
+        ("query_type", "list"),
+    }
+)
+
+
+OBJECT_SET_PAGE_METADATA_OPS = frozenset(
+    {
+        ("ontology_object_set", "load"),
+        ("ontology_object_set", "load_multiple_object_types"),
+        ("ontology_object_set", "load_objects_or_interfaces"),
+    }
+)
+
+
+def _page_data(
+    response: Any, resource: str, operation: str
+) -> dict[str, Any]:
+    """Normalize one SDK page, retaining object-set response fields."""
+    if isinstance(response, dict):
+        items = response.get("data", response.get("items"))
+        token = response.get("next_page_token") or response.get("nextPageToken")
+    else:
+        items = getattr(response, "data", None)
+        token = getattr(response, "next_page_token", None)
+    page = {"items": list(items) if items is not None else [], "next_page_token": token}
+    if (resource, operation) in OBJECT_SET_PAGE_METADATA_OPS:
+        payload = _model_to_dict(response)
+        if not isinstance(payload, dict):
+            payload = vars(response)
+        page["page_metadata"] = {
+            key: _model_to_dict(value)
+            for key, value in payload.items()
+            if key not in {"data", "items", "next_page_token", "nextPageToken"}
+        }
+    return page
+
+
+async def _iterator_page(iterator: Any, page_size: int) -> dict[str, Any]:
+    """Read one page from an SDK iterator when raw response access is absent."""
+    page_iterator = getattr(iterator, "_page_iterator", None)
+    if page_iterator is not None:
+        items = await _resolve_result(page_iterator.get_data())
+        token = await _resolve_result(page_iterator.get_next_page_token())
+        return {"items": list(items), "next_page_token": token}
+
+    raise PaginationBoundaryError("SDK async iterator does not expose page boundaries")
+
 
 def _is_paginated(resource: str, operation: str) -> bool:
     """Return true if operation supports SDK pagination args."""
@@ -1106,7 +1216,14 @@ async def _invoke_paginated(
     helper: PaginationHelper,
     cfg: ConfigLoader,
 ) -> Any:
-    """Invoke a paginated ontology operation through PaginationHelper."""
+    """Fetch one SDK page per call and let PaginationHelper follow its cursor."""
+    helper.reset_progress()
+
+    # Ordinary SDK list methods return iterators that automatically load pages.
+    # Raw response calls expose the same methods as single page envelopes.
+    uses_iterator = (resource, operation) in ITERATOR_PAGINATED_OPS
+    raw_client = getattr(client, "with_raw_response", None) if uses_iterator else None
+    paged_client = raw_client if raw_client is not None else client
 
     async def _single_page(**page_kwargs: Any) -> Any:
         paged_args = argparse.Namespace(**vars(args))
@@ -1114,7 +1231,12 @@ async def _invoke_paginated(
             "page_size", getattr(args, "page_size", None)
         )
         paged_args.page_token = page_kwargs.get("page_token", None)
-        return await _invoke(resource, operation, client, paged_args, timeout, cfg)
+        response = await _invoke(resource, operation, paged_client, paged_args, timeout, cfg)
+        if raw_client is not None:
+            response = await _resolve_result(response.decode())
+        elif uses_iterator and hasattr(response, "__aiter__"):
+            return await _iterator_page(response, helper.page_size)
+        return _page_data(response, resource, operation)
 
     return await helper.paginate(_single_page)
 
@@ -1212,8 +1334,7 @@ async def main() -> int:
             return EXIT_RATE_LIMIT
         return exit_code
     except Exception as exc:
-        ErrorSerializer().serialize(exc)
-        return EXIT_SERVER_ERROR
+        return ErrorSerializer().serialize(exc)
 
 
 def console_main() -> int:
