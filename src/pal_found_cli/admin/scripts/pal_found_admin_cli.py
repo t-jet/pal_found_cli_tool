@@ -38,7 +38,6 @@ from pal_found_cli.common.error_serializer import (  # noqa: E402
     EXIT_ACCESS_CONTROL,
     EXIT_NOT_FOUND,
     EXIT_PERMISSION_DENIED,
-    EXIT_SERVER_ERROR,
     EXIT_SUCCESS,
     EXIT_TIMEOUT,
     EXIT_USER_INPUT,

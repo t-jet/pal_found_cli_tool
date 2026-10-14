@@ -11,7 +11,7 @@ import logging
 import sys
 from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT: str | None = None
@@ -916,9 +916,9 @@ def _kebab(name: str) -> str:
     return name.replace("_", "-")
 
 
-def _common_parser() -> argparse.ArgumentParser:
+def _common_parser() -> _RequiredInputParser:
     """Build shared parser for global options."""
-    common = argparse.ArgumentParser(add_help=False)
+    common = _RequiredInputParser(add_help=False)
     common.add_argument("--timeout", type=int, default=None)
     common.add_argument("--format", choices=["json", "toon", "auto"], default="auto")
     common.add_argument("--pretty", action="store_true")
@@ -937,7 +937,7 @@ def _common_parser() -> argparse.ArgumentParser:
 class _RequiredInputParser(argparse.ArgumentParser):
     """Report missing required flags through the CLI input-error taxonomy."""
 
-    def error(self, message: str) -> None:
+    def error(self, message: str) -> NoReturn:
         if message.startswith("the following arguments are required:") and "--" in message:
             ErrorSerializer().serialize(ValueError(message))
             self.exit(EXIT_USER_INPUT)
