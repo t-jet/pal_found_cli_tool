@@ -22,6 +22,10 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import httpx
+from foundry_sdk import UserTokenAuth
+from foundry_sdk._core.config import Config
+from foundry_sdk.v2 import FoundryClient
 
 from pal_found_cli.common.access_control_guard import AccessControlError, AccessControlGuard
 from pal_found_cli.data_health.scripts import pal_found_data_health_cli as cli
@@ -130,6 +134,31 @@ def test_catalog_contains_exact_6_operations() -> None:
         ("check_report", "get", ("Check", "CheckReport"), "get"),
         ("check_report", "get_latest", ("Check", "CheckReport"), "get_latest"),
     ]
+
+
+def test_sdk_preview_flag_reaches_wire() -> None:
+    """The SDK omits None, while the CLI's True reaches the preview endpoint."""
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(404, json={"errorCode": "NOT_FOUND", "errorName": "CheckNotFound",
+                                          "errorInstanceId": "00000000-0000-0000-0000-000000000001",
+                                          "parameters": {"checkRid": "ri.data-health.main.check.x"}})
+
+    with httpx.Client(transport=httpx.MockTransport(handler), timeout=2) as transport:
+        with patch("foundry_sdk._core.api_client.HttpClient", return_value=transport):
+            client = FoundryClient(hostname="https://synthetic.invalid",
+                                   auth=UserTokenAuth("synthetic-token"),
+                                   config=Config(timeout=2, max_retries=0))
+            for preview in (None, True):
+                with pytest.raises(Exception):
+                    client.data_health.Check.get("ri.data-health.main.check.x", preview=preview)
+
+    assert len(requests) == 2
+    assert requests[0].url.path == requests[1].url.path == "/api/v2/dataHealth/checks/ri.data-health.main.check.x"
+    assert "preview" not in requests[0].url.params
+    assert requests[1].url.params["preview"] == "true"
 
 
 # --------------------------------------------------------------------------
@@ -246,6 +275,7 @@ async def test_check_create_dispatches_config_and_intent(
             "statusCheckConfig": {"severity": "CRITICAL"},
         },
         intent="weekly health",
+        preview=True,
         request_timeout=30,
     )
 
@@ -281,6 +311,7 @@ async def test_check_create_omits_absent_intent(
             },
             "statusCheckConfig": {"severity": "CRITICAL"},
         },
+        preview=True,
         request_timeout=30,
     )
 
@@ -301,7 +332,7 @@ async def test_check_delete_dispatches_to_check_delete(
     assert await cli.main() == 0
     assert json.loads(capsys.readouterr().out) is None
     calls["delete"].assert_awaited_once_with(
-        "ri.data-health.main.check.x", request_timeout=30
+        "ri.data-health.main.check.x", preview=True, request_timeout=30
     )
 
 
@@ -321,7 +352,7 @@ async def test_check_get_dispatches_to_check_get(
     assert await cli.main() == 0
     assert json.loads(capsys.readouterr().out) == {"rid": "ri.c"}
     calls["get"].assert_awaited_once_with(
-        "ri.data-health.main.check.x", request_timeout=30
+        "ri.data-health.main.check.x", preview=True, request_timeout=30
     )
 
 
@@ -359,6 +390,7 @@ async def test_check_replace_dispatches_with_config(
             },
             "statusCheckConfig": {"severity": "WARNING"},
         },
+        preview=True,
         request_timeout=30,
     )
 
@@ -394,6 +426,7 @@ async def test_check_report_get_dispatches_through_nested_client(
     calls["check_report_get"].assert_awaited_once_with(
         "ri.data-health.main.check.x",
         "ri.data-health.main.check-report.y",
+        preview=True,
         request_timeout=30,
     )
 
@@ -425,7 +458,7 @@ async def test_check_report_get_latest_forwards_limit(
     assert await cli.main() == 0
     assert json.loads(capsys.readouterr().out) == {"data": []}
     calls["check_report_get_latest"].assert_awaited_once_with(
-        "ri.data-health.main.check.x", limit=5, request_timeout=30
+        "ri.data-health.main.check.x", limit=5, preview=True, request_timeout=30
     )
 
 
@@ -453,7 +486,7 @@ async def test_check_report_get_latest_omits_absent_limit(
     )
     assert await cli.main() == 0
     calls["check_report_get_latest"].assert_awaited_once_with(
-        "ri.data-health.main.check.x", request_timeout=30
+        "ri.data-health.main.check.x", preview=True, request_timeout=30
     )
 
 
