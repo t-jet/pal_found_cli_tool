@@ -22,6 +22,10 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import httpx
+from foundry_sdk import AsyncFoundryClient, UserTokenAuth
+from foundry_sdk._core.config import Config
+from foundry_sdk.v2 import FoundryClient
 
 from pal_found_cli.common.access_control_guard import AccessControlError, AccessControlGuard
 from pal_found_cli.data_health.scripts import pal_found_data_health_cli as cli
@@ -130,6 +134,187 @@ def test_catalog_contains_exact_6_operations() -> None:
         ("check_report", "get", ("Check", "CheckReport"), "get"),
         ("check_report", "get_latest", ("Check", "CheckReport"), "get_latest"),
     ]
+
+
+def test_sdk_preview_flag_reaches_wire() -> None:
+    """The SDK omits None, while the CLI's True reaches the preview endpoint."""
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(404, json={"errorCode": "NOT_FOUND", "errorName": "CheckNotFound",
+                                          "errorInstanceId": "00000000-0000-0000-0000-000000000001",
+                                          "parameters": {"checkRid": "ri.data-health.main.check.x"}})
+
+    with httpx.Client(transport=httpx.MockTransport(handler), timeout=2) as transport:
+        with patch("foundry_sdk._core.api_client.HttpClient", return_value=transport):
+            client = FoundryClient(hostname="https://synthetic.invalid",
+                                   auth=UserTokenAuth("synthetic-token"),
+                                   config=Config(timeout=2, max_retries=0))
+            for preview in (None, True):
+                with pytest.raises(Exception):
+                    client.data_health.Check.get("ri.data-health.main.check.x", preview=preview)
+
+    assert len(requests) == 2
+    assert requests[0].url.path == requests[1].url.path == "/api/v2/dataHealth/checks/ri.data-health.main.check.x"
+    assert "preview" not in requests[0].url.params
+    assert requests[1].url.params["preview"] == "true"
+
+
+_CHECK_RID = "ri.data-health.main.check.x"
+_REPORT_RID = "ri.data-health.main.check-report.y"
+_CREATE_CONFIG = {
+    "type": "jobStatus",
+    "subject": {"datasetRid": "ri.foundry.main.dataset.x", "branchId": "master"},
+    "statusCheckConfig": {"severity": "CRITICAL"},
+}
+_REPLACE_CONFIG = {
+    "type": "jobStatus",
+    "statusCheckConfig": {"severity": "CRITICAL"},
+}
+_CHECK_RESPONSE = {"rid": _CHECK_RID, "groups": [], "config": _CREATE_CONFIG}
+_REPORT_RESPONSE = {
+    "rid": _REPORT_RID,
+    "check": _CHECK_RESPONSE,
+    "result": {"status": "PASSED"},
+    "createdTime": "2026-01-01T00:00:00Z",
+}
+_WIRE_CASES = (
+    pytest.param(
+        ["check", "create", "--config-json", json.dumps(_CREATE_CONFIG)],
+        "POST", "/api/v2/dataHealth/checks", {}, _CHECK_RESPONSE,
+        id="check-create",
+    ),
+    pytest.param(
+        ["check", "delete", _CHECK_RID],
+        "DELETE", f"/api/v2/dataHealth/checks/{_CHECK_RID}", {}, None,
+        id="check-delete",
+    ),
+    pytest.param(
+        ["check", "get", _CHECK_RID],
+        "GET", f"/api/v2/dataHealth/checks/{_CHECK_RID}", {}, _CHECK_RESPONSE,
+        id="check-get",
+    ),
+    pytest.param(
+        ["check", "replace", _CHECK_RID, "--config-json", json.dumps(_REPLACE_CONFIG)],
+        "PUT", f"/api/v2/dataHealth/checks/{_CHECK_RID}", {}, _CHECK_RESPONSE,
+        id="check-replace",
+    ),
+    pytest.param(
+        ["check-report", "get", _CHECK_RID, _REPORT_RID],
+        "GET", f"/api/v2/dataHealth/checks/{_CHECK_RID}/checkReports/{_REPORT_RID}",
+        {}, _REPORT_RESPONSE,
+        id="check-report-get",
+    ),
+    pytest.param(
+        ["check-report", "get-latest", _CHECK_RID],
+        "GET", f"/api/v2/dataHealth/checks/{_CHECK_RID}/checkReports/getLatest",
+        {}, {"data": []},
+        id="check-report-get-latest",
+    ),
+    pytest.param(
+        ["check", "create", "--config-json", json.dumps(_CREATE_CONFIG),
+         "--intent", "weekly health"],
+        "POST", "/api/v2/dataHealth/checks", {}, _CHECK_RESPONSE,
+        id="check-create-with-intent",
+    ),
+    pytest.param(
+        ["check", "replace", _CHECK_RID, "--config-json", json.dumps(_REPLACE_CONFIG),
+         "--intent", "weekly health"],
+        "PUT", f"/api/v2/dataHealth/checks/{_CHECK_RID}", {}, _CHECK_RESPONSE,
+        id="check-replace-with-intent",
+    ),
+    pytest.param(
+        ["check-report", "get-latest", _CHECK_RID, "--limit", "5"],
+        "GET", f"/api/v2/dataHealth/checks/{_CHECK_RID}/checkReports/getLatest",
+        {"limit": "5"}, {"data": []},
+        id="check-report-get-latest-with-limit",
+    ),
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("argv,method,path,extra_query,response", _WIRE_CASES)
+async def test_cli_preview_reaches_sdk_wire(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+    method: str,
+    path: str,
+    extra_query: dict[str, str],
+    response: dict[str, Any] | None,
+) -> None:
+    requests: list[httpx.Request] = []
+    kwargs_seen: list[dict[str, Any]] = []
+    original_build_kwargs = cli._build_kwargs
+
+    def record_kwargs(spec: cli.OperationSpec, args: argparse.Namespace, timeout: int) -> dict[str, Any]:
+        kwargs = original_build_kwargs(spec, args, timeout)
+        kwargs_seen.append(kwargs)
+        return kwargs
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if response is None:
+            return httpx.Response(204)
+        return httpx.Response(200, json=response)
+
+    monkeypatch.setattr(cli, "_build_kwargs", record_kwargs)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler), timeout=2) as transport:
+        with patch("foundry_sdk._core.api_client.AsyncHttpClient", return_value=transport):
+            client = AsyncFoundryClient(
+                hostname="https://synthetic.invalid",
+                auth=UserTokenAuth("synthetic-token"),
+                config=Config(timeout=2, max_retries=0),
+                preview=True,
+            )
+            factory = _Factory(client)
+            _patch_main(monkeypatch, factory)
+            monkeypatch.setattr(sys, "argv", ["cmd", *argv, "--format", "json"])
+            assert await cli.main() == 0
+
+    assert factory.create_calls == 1
+    assert len(kwargs_seen) == 1
+    assert kwargs_seen[0]["preview"] is True
+    assert "attribution" not in kwargs_seen[0]
+    assert "_sdk_internal" not in kwargs_seen[0]
+    assert len(requests) == 1
+    request = requests[0]
+    assert request.method == method
+    assert request.url.host == "synthetic.invalid"
+    assert request.url.path == path
+    assert request.url.params.get_list("preview") == ["true"]
+    assert dict(request.url.params) == {"preview": "true", **extra_query}
+    if "--intent" in argv:
+        assert kwargs_seen[0]["intent"] == "weekly health"
+        assert json.loads(request.content)["intent"] == "weekly health"
+    else:
+        assert "intent" not in kwargs_seen[0]
+    output = json.loads(capsys.readouterr().out)
+    if response is None:
+        assert output is None
+    elif "rid" in response:
+        assert output["rid"] == response["rid"]
+    else:
+        assert output["data"] == response["data"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "argv", [pytest.param(case.values[0], id=case.id) for case in _WIRE_CASES]
+)
+async def test_cli_rejects_user_preview_override_before_client(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+) -> None:
+    root, _ = _root()
+    factory = _Factory(root)
+    _patch_main(monkeypatch, factory)
+    monkeypatch.setattr(sys, "argv", ["cmd", *argv, "--preview", "false"])
+    assert await cli.main() == 1
+    assert json.loads(capsys.readouterr().out)["exit_code"] == 1
+    assert factory.create_calls == 0
 
 
 # --------------------------------------------------------------------------
@@ -246,6 +431,7 @@ async def test_check_create_dispatches_config_and_intent(
             "statusCheckConfig": {"severity": "CRITICAL"},
         },
         intent="weekly health",
+        preview=True,
         request_timeout=30,
     )
 
@@ -281,6 +467,7 @@ async def test_check_create_omits_absent_intent(
             },
             "statusCheckConfig": {"severity": "CRITICAL"},
         },
+        preview=True,
         request_timeout=30,
     )
 
@@ -301,7 +488,7 @@ async def test_check_delete_dispatches_to_check_delete(
     assert await cli.main() == 0
     assert json.loads(capsys.readouterr().out) is None
     calls["delete"].assert_awaited_once_with(
-        "ri.data-health.main.check.x", request_timeout=30
+        "ri.data-health.main.check.x", preview=True, request_timeout=30
     )
 
 
@@ -321,7 +508,7 @@ async def test_check_get_dispatches_to_check_get(
     assert await cli.main() == 0
     assert json.loads(capsys.readouterr().out) == {"rid": "ri.c"}
     calls["get"].assert_awaited_once_with(
-        "ri.data-health.main.check.x", request_timeout=30
+        "ri.data-health.main.check.x", preview=True, request_timeout=30
     )
 
 
@@ -359,6 +546,7 @@ async def test_check_replace_dispatches_with_config(
             },
             "statusCheckConfig": {"severity": "WARNING"},
         },
+        preview=True,
         request_timeout=30,
     )
 
@@ -394,6 +582,7 @@ async def test_check_report_get_dispatches_through_nested_client(
     calls["check_report_get"].assert_awaited_once_with(
         "ri.data-health.main.check.x",
         "ri.data-health.main.check-report.y",
+        preview=True,
         request_timeout=30,
     )
 
@@ -425,7 +614,7 @@ async def test_check_report_get_latest_forwards_limit(
     assert await cli.main() == 0
     assert json.loads(capsys.readouterr().out) == {"data": []}
     calls["check_report_get_latest"].assert_awaited_once_with(
-        "ri.data-health.main.check.x", limit=5, request_timeout=30
+        "ri.data-health.main.check.x", limit=5, preview=True, request_timeout=30
     )
 
 
@@ -453,7 +642,7 @@ async def test_check_report_get_latest_omits_absent_limit(
     )
     assert await cli.main() == 0
     calls["check_report_get_latest"].assert_awaited_once_with(
-        "ri.data-health.main.check.x", request_timeout=30
+        "ri.data-health.main.check.x", preview=True, request_timeout=30
     )
 
 
