@@ -506,7 +506,7 @@ async def _paginate_operation(
     )
     positional = tuple(getattr(args, name) for name in spec["positional"])
     extra_kwargs: dict[str, Any] = {}
-    for name in spec["optional"]:
+    for name in (*spec["required"], *spec["optional"]):
         if name in {"page_size", "page_token"}:
             continue
         value = getattr(args, name, None)
