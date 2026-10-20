@@ -509,7 +509,7 @@ async def test_schedule_version_schedule_optional_result_null(
     out = capsys.readouterr().out
     assert json.loads(out) is None
     calls["schedule_version_schedule"].assert_awaited_once_with(
-        "ri.sv", request_timeout=30
+        "ri.sv", preview=True, request_timeout=30
     )
 
 

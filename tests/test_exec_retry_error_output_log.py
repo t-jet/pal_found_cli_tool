@@ -232,7 +232,7 @@ class TestRetryHandler_TC:
         assert flaky_func.__name__ == "flaky_func"
         assert flaky_func.__doc__ is None  # Original has no docstring
 
-        result = asyncio.get_event_loop().run_until_complete(flaky_func())
+        result = asyncio.run(flaky_func())
         assert result == "success"
         assert call_count == 3
 
@@ -255,7 +255,7 @@ class TestRetryHandler_TC:
         async def success():
             return "done"
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             handler.context().__aenter__()
         )
         # Verify context manager yields self
@@ -280,7 +280,7 @@ class TestRetryHandler_TC:
             raise exc
 
         with pytest.raises(requests.RequestException) as exc_info:
-            asyncio.get_event_loop().run_until_complete(handler.execute(always_fail))
+            asyncio.run(handler.execute(always_fail))
 
         assert str(exc_info.value) == "failure"
 
@@ -302,7 +302,7 @@ class TestRetryHandler_TC:
             raise requests.RequestException("fail")
 
         with pytest.raises(requests.RequestException):
-            asyncio.get_event_loop().run_until_complete(handler.execute(failing))
+            asyncio.run(handler.execute(failing))
 
         assert attempt_count == 1, (
             f"Expected 1 attempt with max_retries=0, got {attempt_count}"
@@ -548,11 +548,10 @@ class TestOutputFormatter_TC:
         data = [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
         formatter = OutputFormatter(format_setting="toon")
         result = formatter.format(data)
-        # TOON output should be a table with header, separator, and data rows
-        lines = result.split("\n")
-        assert len(lines) >= 3  # header + separator + at least 1 data row
-        assert "id" in lines[0] and "name" in lines[0]  # Header contains column names
-        assert "-" in lines[1]  # Separator line
+        import toon_format
+
+        assert result == '[2]{id,name}:\n  "1",Alice\n  "2",Bob'
+        assert toon_format.loads(result) == data
 
     def test_TC_OF_003_auto_selection_explicit_format_wins(self, clean_output_env):
         """TC-OF-003: Auto-selection — explicit format wins (Step 1 of ADR-004)."""
@@ -604,9 +603,10 @@ class TestOutputFormatter_TC:
         # Uniform field set -> TOON
         uniform = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
         result = formatter.format(uniform)
-        lines = result.split("\n")
-        assert "a" in lines[0] and "b" in lines[0]  # Header
-        assert "-" in lines[1]  # Separator
+        import toon_format
+
+        assert result == "[2]{a,b}:\n  1,2\n  3,4"
+        assert toon_format.loads(result) == uniform
 
         # Mixed field sets -> JSON
         mixed = [{"a": 1}, {"a": 2, "b": 3}]
@@ -782,7 +782,7 @@ class TestIntegration_TC:
         # Execute and catch exception
         last_exc = None
         try:
-            asyncio.get_event_loop().run_until_complete(handler.execute(always_fail))
+            asyncio.run(handler.execute(always_fail))
         except requests.RequestException as e:
             last_exc = e
 
@@ -839,7 +839,7 @@ class TestIntegration_TC:
 
         last_exc = None
         try:
-            asyncio.get_event_loop().run_until_complete(handler.execute(fail))
+            asyncio.run(handler.execute(fail))
         except requests.RequestException as e:
             last_exc = e
 
@@ -893,7 +893,7 @@ class TestNonFunctional_TC:
 
         start = time.time()
         with pytest.raises(requests.RequestException):
-            asyncio.get_event_loop().run_until_complete(handler.execute(always_fail))
+            asyncio.run(handler.execute(always_fail))
         elapsed = time.time() - start
 
         # 3 retries with 0.1s delay each = ~0.3s minimum

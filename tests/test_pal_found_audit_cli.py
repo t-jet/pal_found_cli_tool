@@ -920,15 +920,14 @@ async def test_main_content_forces_json_and_orders_acl_scope_client_retry(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("cli_timeout", "config_timeout"), [(17, 42), (None, 42)])
+@pytest.mark.parametrize(("cli_timeout", "environment_timeout"), [(17, 42), (None, 42)])
 async def test_main_passes_selected_timeout_to_retry_and_sdk(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     cli_timeout: int | None,
-    config_timeout: int,
+    environment_timeout: int,
 ) -> None:
-    class Cfg(_Cfg):
-        timeout_s = config_timeout
+    monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_TIMEOUT_S", str(environment_timeout))
 
     endpoint = _RawListEndpoint({None: _Page([], None)})
     factory = _Factory(_LogFileClient(raw=endpoint))
@@ -938,7 +937,7 @@ async def test_main_passes_selected_timeout_to_retry_and_sdk(
         captured.update(kwargs)
         return _ImmediateRetry()
 
-    _patch_main_dependencies(monkeypatch, factory, cfg_type=Cfg)
+    _patch_main_dependencies(monkeypatch, factory)
     monkeypatch.setattr(pal_found_audit_cli, "RetryHandler", retry_factory)
     argv = [
         "prog",
@@ -953,7 +952,7 @@ async def test_main_passes_selected_timeout_to_retry_and_sdk(
     monkeypatch.setattr(sys, "argv", argv)
     assert await pal_found_audit_cli.main() == 0
     capsys.readouterr()
-    expected = cli_timeout if cli_timeout is not None else config_timeout
+    expected = cli_timeout if cli_timeout is not None else environment_timeout
     assert captured == {"timeout_s": expected}
     assert endpoint.calls[0][1]["request_timeout"] == expected
 

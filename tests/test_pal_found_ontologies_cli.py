@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from foundry_sdk._core.resource_iterator import AsyncResourceIterator
 
+from pal_found_cli.common.cli_parser import CLIInputError
 from pal_found_cli.ontologies.scripts import pal_found_ontologies_cli as cli
 
 
@@ -336,9 +337,9 @@ def test_sdk_required_keywords_are_parser_required(resource, operation):
         flag = "--" + name.replace("_", "-")
         index = argv.index(flag)
         missing = argv[:index] + argv[index + 2 :]
-        with pytest.raises(SystemExit) as exc:
+        with pytest.raises(CLIInputError, match="Invalid command input") as exc:
             cli.build_parser().parse_args(missing)
-        assert exc.value.code == cli.EXIT_USER_INPUT
+        assert exc.value.exit_code == cli.EXIT_USER_INPUT
 
 
 @pytest.mark.parametrize(

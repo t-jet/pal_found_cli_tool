@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from pal_found_cli.common.cli_parser import CLIInputError
 from pal_found_cli.datasets.scripts import pal_found_datasets_cli
 
 
@@ -40,20 +41,20 @@ def test_async_main_without_resource_returns_user_input_error(monkeypatch):
 def test_transaction_create_requires_transaction_type():
     parser = pal_found_datasets_cli.build_parser()
 
-    with pytest.raises(SystemExit) as error:
+    with pytest.raises(CLIInputError, match="^Invalid command input$") as error:
         parser.parse_args(["transaction", "create", "ri.foundry.main.dataset.example"])
 
-    assert error.value.code == 2
+    assert error.value.exit_code == 1
 
 
 def test_read_table_requires_format_and_rejects_pagination():
     parser = pal_found_datasets_cli.build_parser()
 
-    with pytest.raises(SystemExit) as missing_format:
+    with pytest.raises(CLIInputError, match="^Invalid command input$") as missing_format:
         parser.parse_args(["dataset", "read-table", "dataset-rid"])
-    assert missing_format.value.code == 2
+    assert missing_format.value.exit_code == 1
 
-    with pytest.raises(SystemExit) as unsupported_page_size:
+    with pytest.raises(CLIInputError, match="^Invalid command input$") as unsupported_page_size:
         parser.parse_args(
             [
                 "dataset",
@@ -65,7 +66,7 @@ def test_read_table_requires_format_and_rejects_pagination():
                 "10",
             ]
         )
-    assert unsupported_page_size.value.code == 2
+    assert unsupported_page_size.value.exit_code == 1
 
 
 @pytest.mark.asyncio

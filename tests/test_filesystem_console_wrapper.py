@@ -1,5 +1,5 @@
 import sys
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import Mock, AsyncMock, MagicMock
 
 import pytest
 
@@ -59,12 +59,13 @@ async def test_packaged_main_success(monkeypatch, capsys):
         pal_found_filesystem_cli, "AccessControlGuard", lambda cfg, ns: MagicMock()
     )
     monkeypatch.setattr(pal_found_filesystem_cli, "AsyncClientFactory", Factory)
-    monkeypatch.setattr(pal_found_filesystem_cli, "RetryHandler", lambda: retry)
+    monkeypatch.setattr(pal_found_filesystem_cli, "RetryHandler", Mock(return_value=retry))
     monkeypatch.setattr(
         sys, "argv", ["prog", "resource", "get", "resource-rid", "--format", "json"]
     )
 
     rc = await pal_found_filesystem_cli.main()
+    pal_found_filesystem_cli.RetryHandler.assert_called_once_with(timeout_s=30)
 
     assert rc == pal_found_filesystem_cli.EXIT_SUCCESS
     assert "rid" in capsys.readouterr().out

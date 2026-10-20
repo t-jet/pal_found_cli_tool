@@ -530,11 +530,13 @@ async def test_main_success_uses_admin_acl_retry_output_and_b3_scope(monkeypatch
     monkeypatch.setattr(pal_found_admin_cli, "LogSetup", MagicMock())
     monkeypatch.setattr(pal_found_admin_cli, "AccessControlGuard", lambda cfg, ns: guard)
     monkeypatch.setattr(pal_found_admin_cli, "AsyncClientFactory", lambda: factory)
-    monkeypatch.setattr(pal_found_admin_cli, "RetryHandler", lambda: retry)
+    retry_factory = MagicMock(return_value=retry)
+    monkeypatch.setattr(pal_found_admin_cli, "RetryHandler", retry_factory)
     monkeypatch.setattr(sys, "argv", ["prog", "user", "get", "user-id", "--format", "json"])
 
     rc = await pal_found_admin_cli.main()
 
+    retry_factory.assert_called_once_with(timeout_s=30)
     assert rc == pal_found_admin_cli.EXIT_SUCCESS
     guard.check.assert_called_once_with("user", "get")
     assert retry.execute.await_count == 1
@@ -597,11 +599,13 @@ async def test_main_returns_adr_001_exit_codes(monkeypatch, capsys, exc, exit_co
         pal_found_admin_cli, "AccessControlGuard", lambda cfg, ns: MagicMock()
     )
     monkeypatch.setattr(pal_found_admin_cli, "AsyncClientFactory", lambda: factory)
-    monkeypatch.setattr(pal_found_admin_cli, "RetryHandler", lambda: retry)
+    retry_factory = MagicMock(return_value=retry)
+    monkeypatch.setattr(pal_found_admin_cli, "RetryHandler", retry_factory)
     monkeypatch.setattr(sys, "argv", ["prog", "user", "get", "user-id"])
 
     rc = await pal_found_admin_cli.main()
 
+    retry_factory.assert_called_once_with(timeout_s=30)
     assert rc == exit_code
     envelope = json.loads(capsys.readouterr().out)
     assert envelope["exit_code"] == exit_code

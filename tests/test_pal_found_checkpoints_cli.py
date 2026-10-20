@@ -223,7 +223,7 @@ async def test_get_dispatches_to_record_get(
     assert await cli.main() == 0
     assert json.loads(capsys.readouterr().out) == {"rid": "ri.r"}
     calls["get"].assert_awaited_once_with(
-        "ri.checks.main.record.x", request_timeout=30
+        "ri.checks.main.record.x", preview=True, request_timeout=30
     )
 
 
@@ -253,7 +253,7 @@ async def test_get_batch_dispatches_body_positionally(
     assert await cli.main() == 0
     assert json.loads(capsys.readouterr().out) == {"data": {"ri.r": {"rid": "ri.r"}}}
     calls["get_batch"].assert_awaited_once_with(
-        [{"recordRid": "ri.checks.main.record.x"}], request_timeout=30
+        [{"recordRid": "ri.checks.main.record.x"}], preview=True, request_timeout=30
     )
 
 

@@ -58,9 +58,15 @@ def clean_env(monkeypatch):
         "FOUNDRY_AGENTIC_CLI_ENABLE_TRACING",
         "FOUNDRY_AGENTIC_CLI_LOG_LEVEL",
     ]
+    original_environment = dict(os.environ)
     for key in keys_to_clear:
         monkeypatch.delenv(key, raising=False)
-    return monkeypatch
+    try:
+        yield monkeypatch
+    finally:
+        monkeypatch.undo()
+        os.environ.clear()
+        os.environ.update(original_environment)
 
 
 @pytest.fixture

@@ -231,13 +231,15 @@ async def test_main_success_uses_acl_retry_output_and_b3_scope(monkeypatch, caps
         pal_found_functions_cli, "AccessControlGuard", lambda cfg, ns: guard
     )
     monkeypatch.setattr(pal_found_functions_cli, "AsyncClientFactory", lambda: factory)
-    monkeypatch.setattr(pal_found_functions_cli, "RetryHandler", lambda: retry)
+    retry_factory = MagicMock(return_value=retry)
+    monkeypatch.setattr(pal_found_functions_cli, "RetryHandler", retry_factory)
     monkeypatch.setattr(
         sys, "argv", ["prog", "query", "get", "query-name", "--format", "json"]
     )
 
     rc = await pal_found_functions_cli.main()
 
+    retry_factory.assert_called_once_with(timeout_s=30)
     assert rc == pal_found_functions_cli.EXIT_SUCCESS
     guard.check.assert_called_once_with("query", "get")
     assert retry.execute.await_count == 1
@@ -293,11 +295,13 @@ async def test_main_returns_adr_001_exit_codes(monkeypatch, exc, exit_code):
         pal_found_functions_cli, "AccessControlGuard", lambda cfg, ns: MagicMock()
     )
     monkeypatch.setattr(pal_found_functions_cli, "AsyncClientFactory", lambda: factory)
-    monkeypatch.setattr(pal_found_functions_cli, "RetryHandler", lambda: retry)
+    retry_factory = MagicMock(return_value=retry)
+    monkeypatch.setattr(pal_found_functions_cli, "RetryHandler", retry_factory)
     monkeypatch.setattr(sys, "argv", ["prog", "query", "get", "query-name"])
 
     rc = await pal_found_functions_cli.main()
 
+    retry_factory.assert_called_once_with(timeout_s=30)
     assert rc == exit_code
 
 

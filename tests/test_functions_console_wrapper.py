@@ -1,5 +1,5 @@
 import sys
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import Mock, AsyncMock, MagicMock
 
 import pytest
 
@@ -59,12 +59,13 @@ async def test_packaged_main_success(monkeypatch, capsys):
         pal_found_functions_cli, "AccessControlGuard", lambda cfg, ns: MagicMock()
     )
     monkeypatch.setattr(pal_found_functions_cli, "AsyncClientFactory", Factory)
-    monkeypatch.setattr(pal_found_functions_cli, "RetryHandler", lambda: retry)
+    monkeypatch.setattr(pal_found_functions_cli, "RetryHandler", Mock(return_value=retry))
     monkeypatch.setattr(
         sys, "argv", ["prog", "query", "get", "query-name", "--format", "json"]
     )
 
     rc = await pal_found_functions_cli.main()
+    pal_found_functions_cli.RetryHandler.assert_called_once_with(timeout_s=30)
 
     assert rc == pal_found_functions_cli.EXIT_SUCCESS
     assert "rid" in capsys.readouterr().out
@@ -103,7 +104,7 @@ async def test_streaming_query_preserves_ndjson_content(monkeypatch, capsys):
     )
     monkeypatch.setattr(pal_found_functions_cli, "AsyncClientFactory", Factory)
     monkeypatch.setattr(pal_found_functions_cli, "_get_client", lambda *args: MagicMock())
-    monkeypatch.setattr(pal_found_functions_cli, "RetryHandler", lambda: retry)
+    monkeypatch.setattr(pal_found_functions_cli, "RetryHandler", Mock(return_value=retry))
     monkeypatch.setattr(
         sys,
         "argv",
