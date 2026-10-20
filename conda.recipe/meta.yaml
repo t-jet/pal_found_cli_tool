@@ -10,6 +10,8 @@ source:
 build:
   number: 0
   noarch: python
+  script_env:
+    - SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PAL_FOUND_CLI={{ version }}
   entry_points:
     - pal-found-datasets = pal_found_cli.datasets.scripts.pal_found_datasets_cli:main
     - pal-found-filesystem = pal_found_cli.filesystem.scripts.pal_found_filesystem_cli:console_main
@@ -33,7 +35,7 @@ build:
 
 requirements:
   host:
-    - python >=3.11
+    - python {{ python | default("3.11") }}
     - pip
     - setuptools >=68
     - setuptools-scm >=8
@@ -46,6 +48,8 @@ requirements:
     - toon-format ==1.2.0
 
 test:
+  requires:
+    - python {{ python | default("3.11") }}
   imports:
     - pal_found_cli.common.output_formatter
     - toon_format
