@@ -28,6 +28,8 @@ if _PROJECT_ROOT is None:
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+from pal_found_cli.common.cli_parser import ArgumentParser as _ArgumentParser  # noqa: E402
+from pal_found_cli.common.cli_parser import CLIInputError  # noqa: E402
 from pal_found_cli.common.access_control_guard import (  # noqa: E402
     AccessControlError,
     AccessControlGuard,
@@ -46,7 +48,8 @@ from pal_found_cli.common.error_serializer import (  # noqa: E402
 from pal_found_cli.common.log_setup import LogSetup  # noqa: E402
 from pal_found_cli.common.output_formatter import OutputFormatter  # noqa: E402
 from pal_found_cli.common.pagination_helper import PaginationBoundaryError, PaginationHelper  # noqa: E402
-from pal_found_cli.common.retry import RetryHandler  # noqa: E402
+from pal_found_cli.common.retry import RetryHandler
+from pal_found_cli.common.timeout_config import resolve_timeout  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -294,9 +297,9 @@ def _kebab(name: str) -> str:
 
 def _common_parser(*, paginated: bool) -> argparse.ArgumentParser:
     """Build shared parser for operation-level common options."""
-    common = argparse.ArgumentParser(add_help=False)
+    common = _ArgumentParser(add_help=False)
     common.add_argument("--timeout", type=int, default=None)
-    common.add_argument("--format", choices=["json", "toon", "auto"], default="auto")
+    common.add_argument("--format", choices=["json", "toon", "auto"], default=None)
     common.add_argument("--pretty", action="store_true")
     if paginated:
         common.add_argument("--page-size", type=int, default=None, dest="page_size")
@@ -318,7 +321,7 @@ def _add_kwarg(
 
 def build_parser() -> argparse.ArgumentParser:
     """Build argparse parser with all 66 admin operations."""
-    parser = argparse.ArgumentParser(
+    parser = _ArgumentParser(
         prog="pal_found_admin_cli",
         description="Foundry Admin CLI - 66 operations",
     )
@@ -516,12 +519,12 @@ async def _invoke_paginated(
 async def main() -> int:
     """Run the Foundry Admin CLI."""
     parser = build_parser()
-    args = parser.parse_args()
-    if not args.resource:
-        parser.print_help()
-        return EXIT_USER_INPUT
-    if not getattr(args, "operation", None):
-        parser.print_help()
+    try:
+        args = parser.parse_args()
+        if not args.resource or not getattr(args, "operation", None):
+            raise CLIInputError("An operation is required")
+    except CLIInputError as exc:
+        ErrorSerializer().serialize(exc)
         return EXIT_USER_INPUT
 
     cfg = ConfigLoader()
@@ -548,10 +551,10 @@ async def main() -> int:
 
     factory = AsyncClientFactory()
     try:
+        timeout = resolve_timeout(args.timeout, default=cfg.timeout_s)
         with factory.invocation_scope(cfg):
             client = _get_client(cfg, resource, factory)
-            timeout = getattr(args, "timeout", None) or getattr(cfg, "timeout_s", None)
-            retry_handler = RetryHandler()
+            retry_handler = RetryHandler(timeout_s=timeout)
             helper: PaginationHelper | None = None
             if _is_paginated(resource, operation):
                 helper = PaginationHelper(
@@ -579,7 +582,7 @@ async def main() -> int:
                     timeout,
                 )
         formatter = OutputFormatter(
-            format_setting=getattr(args, "format", "auto"),
+            format_setting=getattr(args, "format", None),
             pretty=getattr(args, "pretty", False),
         )
         print(formatter.format(_model_to_dict(result)))

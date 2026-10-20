@@ -197,7 +197,8 @@ class TestRetryHandler_TC:
         monkeypatch.setenv("FOUNDRY_AGENTIC_CLI_RETRY_JITTER", "false")
 
         handler = RetryHandler()
-        assert handler.max_retries == 5
+        assert handler.max_attempts == 5
+        assert handler.max_retries == 4
         assert handler.base_delay_ms == 2000.0
         assert handler.max_delay_ms == 10000.0
         assert handler.base_delay == 2.0

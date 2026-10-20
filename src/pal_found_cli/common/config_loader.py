@@ -17,6 +17,7 @@ from typing import TypeVar
 from dotenv import load_dotenv
 
 from pal_found_cli.common.log_setup import DEFAULT_LOG_LEVEL, ENV_LOG_LEVEL
+from pal_found_cli.common.timeout_config import resolve_timeout
 
 # Environment variable names
 ENV_ENV_FILE = "FOUNDRY_AGENTIC_CLI_ENV_FILE"
@@ -279,14 +280,7 @@ class ConfigLoader:
     @property
     def timeout_s(self) -> int:
         """Call timeout in seconds (ADR-002)."""
-        val = os.environ.get(ENV_TIMEOUT_S)
-        if val is None:
-            return DEFAULT_TIMEOUT_S
-        try:
-            timeout = int(val)
-            return max(DEFAULT_MIN_TIMEOUT_S, min(DEFAULT_MAX_TIMEOUT_S, timeout))
-        except ValueError:
-            return DEFAULT_TIMEOUT_S
+        return resolve_timeout()
 
     @property
     def default_format(self) -> str:

@@ -10,7 +10,7 @@ an optional signal handler (ADR-002 §Consequences).
 Environment Variables (canonical, per SRS Table 5.3 / FR-ERR-4)
 ---------------------------------------------------------------
 FOUNDRY_AGENTIC_CLI_RETRY_MAX_ATTEMPTS : int
-    Maximum number of retry attempts. Default: 4
+    Maximum total calls, including the first. Default: 4
 FOUNDRY_AGENTIC_CLI_RETRY_INITIAL_DELAY_MS : float
     Base delay in **milliseconds** for exponential backoff. Default: 500
 FOUNDRY_AGENTIC_CLI_RETRY_MAX_DELAY_MS : float
@@ -46,6 +46,7 @@ from pal_found_cli.common.sdk_error_utils import (
     is_sdk_retryable_transport,
     sdk_http_status,
 )
+from pal_found_cli.common.timeout_config import resolve_timeout, validate_internal_timeout
 
 if TYPE_CHECKING:
     from pal_found_cli.common.tracing_provider import B3Context, TracingProvider
@@ -266,7 +267,9 @@ class RetryHandler:
     Parameters
     ----------
     max_retries : int, optional
-        Maximum number of retry attempts. Read from env var if not set.
+        Legacy retry count, excluding the first call.
+    max_attempts : int, optional
+        Total calls including the first. Defaults to canonical env/default 4.
     base_delay : float, optional
         Base delay in **milliseconds** for backoff. Read from env var if
         not set. Kept under the legacy name for call-site compatibility;
@@ -308,14 +311,26 @@ class RetryHandler:
         jitter: bool | None = None,
         retry_on: tuple[type[BaseException], ...] | None = None,
         timeout_s: float | None = ...,  # type: ignore[assignment]
+        *,
+        max_attempts: int | None = None,
     ) -> None:
-        # ``max_retries`` is accepted for call-site backwards compatibility;
-        # canonical name going forward is "max_attempts".
-        self.max_retries = (
-            max_retries
-            if max_retries is not None
-            else int(os.environ.get(ENV_MAX_ATTEMPTS, DEFAULT_MAX_ATTEMPTS))
-        )
+        if max_attempts is not None and max_retries is not None:
+            raise ValueError("Specify max_attempts or max_retries, not both")
+        if max_retries is not None:
+            if type(max_retries) is not int or max_retries < 0:
+                raise ValueError("max_retries must be a nonnegative integer")
+            self.max_attempts = max_retries + 1
+        elif max_attempts is not None:
+            if type(max_attempts) is not int or max_attempts < 1:
+                raise ValueError("max_attempts must be a positive integer")
+            self.max_attempts = max_attempts
+        else:
+            try:
+                attempts = int(os.environ.get(ENV_MAX_ATTEMPTS, DEFAULT_MAX_ATTEMPTS))
+            except ValueError:
+                attempts = DEFAULT_MAX_ATTEMPTS
+            self.max_attempts = max(1, attempts)
+        self.max_retries = self.max_attempts - 1
         # Delays are read from canonical *_MS env vars. Accept explicit
         # constructor overrides in **milliseconds** to match the env contract.
         self.base_delay_ms = (
@@ -343,8 +358,8 @@ class RetryHandler:
         # back to the canonical timeout. ``None`` explicitly disables the
         # wait_for wrapper (used by unit tests that want raw control).
         if timeout_s is ...:
-            timeout_s = float(os.environ.get(ENV_TIMEOUT_S, DEFAULT_TIMEOUT_S))
-        self.timeout_s: float | None = timeout_s
+            timeout_s = resolve_timeout()
+        self.timeout_s: float | None = validate_internal_timeout(timeout_s)
 
     # Backwards-compatible alias: ``base_delay``/``max_delay`` historically
     # returned seconds. To preserve existing call sites and repr output we
@@ -437,7 +452,7 @@ class RetryHandler:
         """
         last_exception: BaseException | None = None
 
-        for attempt in range(self.max_retries + 1):
+        for attempt in range(self.max_attempts):
             signal_scope = _SignalCancellationScope()
             restore_signals = signal_scope.install()
             try:

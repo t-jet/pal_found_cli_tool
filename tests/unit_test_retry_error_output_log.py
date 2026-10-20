@@ -298,7 +298,8 @@ class TestRetryHandlerInit:
         )
 
         handler = RetryHandler()
-        assert handler.max_retries == DEFAULT_MAX_ATTEMPTS
+        assert handler.max_attempts == DEFAULT_MAX_ATTEMPTS
+        assert handler.max_retries == DEFAULT_MAX_ATTEMPTS - 1
         assert handler.base_delay_ms == DEFAULT_INITIAL_DELAY_MS
         assert handler.max_delay_ms == DEFAULT_MAX_DELAY_MS
         assert handler.multiplier == DEFAULT_MULTIPLIER
@@ -328,7 +329,8 @@ class TestRetryHandlerInit:
 
         monkeypatch.setenv(ENV_MAX_ATTEMPTS, "7")
         handler = RetryHandler()
-        assert handler.max_retries == 7
+        assert handler.max_attempts == 7
+        assert handler.max_retries == 6
 
     def test_env_var_initial_delay_ms(self, clean_retry_env, monkeypatch):
         from pal_found_cli.common.retry import ENV_INITIAL_DELAY_MS, RetryHandler
@@ -560,7 +562,7 @@ class TestRetryHandlerExecute:
         """BUG-SUB-001: each attempt uses asyncio.wait_for with env timeout."""
         from pal_found_cli.common.retry import ENV_TIMEOUT_S, RetryHandler
 
-        monkeypatch.setenv(ENV_TIMEOUT_S, "0.25")
+        monkeypatch.setenv(ENV_TIMEOUT_S, "25")
         handler = RetryHandler(max_retries=0)
         mock_coro = AsyncMock(return_value="success")
         wait_for_calls = []
@@ -573,7 +575,7 @@ class TestRetryHandlerExecute:
             result = await handler.execute(mock_coro)
 
         assert result == "success"
-        assert wait_for_calls == [0.25]
+        assert wait_for_calls == [25]
 
     @pytest.mark.asyncio
     async def test_timeout_breach_raises_timeout_error(self, clean_retry_env):
@@ -1319,15 +1321,13 @@ class TestOutputFormatterTOON:
         assert "Alice" in result
         assert "Bob" in result
 
-    def test_toon_with_header_separator(self, clean_output_env):
+    def test_toon_with_array_header(self, clean_output_env):
         from pal_found_cli.common.output_formatter import OutputFormatter
 
         fmt = OutputFormatter(format_setting="toon")
         data = [{"id": 1, "val": "a"}]
         result = fmt.format(data)
-        lines = result.split("\n")
-        assert len(lines) >= 3  # header + separator + data
-        assert "-" in lines[1]  # separator line
+        assert result == "[1]{id,val}:\n  1,a"
 
     def test_toon_empty_list_returns_empty(self, clean_output_env):
         from pal_found_cli.common.output_formatter import OutputFormatter

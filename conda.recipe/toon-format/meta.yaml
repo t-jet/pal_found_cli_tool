@@ -1,0 +1,35 @@
+{% set version = "1.2.0" %}
+
+package:
+  name: toon-format
+  version: {{ version }}
+
+source:
+  url: https://files.pythonhosted.org/packages/06/9e/88b94e00ae3589130bb2bde233c60b55776deb670cc3d077657d6a8b9a2e/toon_format-1.2.0.tar.gz
+  sha256: ed09c0cb8ba58f17372f876df1e43400d2d916aef67c641f152d8a28c5898669
+
+build:
+  number: 0
+  noarch: python
+  script: {{ PYTHON }} -m pip install . --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.10
+    - pip
+    - uv-build >=0.12.20,<0.13
+  run:
+    - python >=3.10
+
+test:
+  imports:
+    - toon_format
+  commands:
+    - >-
+      python -c "import toon_format; value = [{'name': 'comma,value', 'enabled': True, 'empty': None}]; assert toon_format.loads(toon_format.dumps(value)) == value"
+
+about:
+  home: https://github.com/toon-format/toon-python
+  license: MIT
+  license_file: LICENSE
+  summary: Official Python implementation of Token-Oriented Object Notation

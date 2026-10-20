@@ -37,8 +37,10 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any
 
+from pal_found_cli.common.cli_parser import ArgumentParser as _ArgumentParser  # noqa: E402
+from pal_found_cli.common.cli_parser import CLIInputError  # noqa: E402
 from pal_found_cli.common.access_control_guard import (
     AccessControlError,
     AccessControlGuard,
@@ -62,6 +64,7 @@ from pal_found_cli.common.log_setup import LogSetup
 from pal_found_cli.common.output_formatter import OutputFormatter
 from pal_found_cli.common.pagination_helper import HARD_MAX_BATCH_PAGES, PaginationHelper
 from pal_found_cli.common.retry import RetryHandler
+from pal_found_cli.common.timeout_config import resolve_timeout
 from pal_found_cli.common.sdk_error_utils import sdk_exception_exit_code, sdk_http_status
 
 logger = logging.getLogger(__name__)
@@ -79,17 +82,8 @@ PAGINATED_OPS: frozenset[tuple[str, str]] = frozenset({("version", "list")})
 _UPLOAD_MAX_BYTES = 16 * 1024 * 1024
 
 
-class CLIInputError(ValueError):
-    """A locally generated input error whose message never echoes values."""
-
-    exit_code = EXIT_USER_INPUT
 
 
-class _ArgumentParser(argparse.ArgumentParser):
-    """Raise parser failures into the structured error boundary."""
-
-    def error(self, message: str) -> NoReturn:
-        raise CLIInputError("Invalid command input")
 
 
 def _op(
@@ -197,7 +191,7 @@ def _common_parser(*, paginated: bool) -> _ArgumentParser:
     """Build operation-level common options."""
     parser = _ArgumentParser(add_help=False)
     parser.add_argument("--timeout", type=int, default=None)
-    parser.add_argument("--format", choices=("json", "toon", "auto"), default="auto")
+    parser.add_argument("--format", choices=("json", "toon", "auto"), default=None)
     parser.add_argument("--pretty", action="store_true")
     if paginated:
         parser.add_argument("--page-size", type=int, default=None, dest="page_size")
@@ -492,9 +486,7 @@ async def main() -> int:
         operation = args.operation.replace("-", "_")
         spec = _spec_for(resource, operation)
         _validate_inputs(spec, args)
-        timeout = _validate_timeout(
-            args.timeout if args.timeout is not None else cfg.timeout_s
-        )
+        timeout = resolve_timeout(args.timeout, default=cfg.timeout_s)
         AccessControlGuard(
             cfg,
             "THIRD_PARTY_APPLICATIONS",

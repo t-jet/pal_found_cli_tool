@@ -11,7 +11,7 @@ import logging
 import sys
 from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT: str | None = None
@@ -28,6 +28,8 @@ if _PROJECT_ROOT is None:
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+from pal_found_cli.common.cli_parser import ArgumentParser as _ArgumentParser  # noqa: E402
+from pal_found_cli.common.cli_parser import CLIInputError  # noqa: E402
 from pal_found_cli.common.access_control_guard import (
     AccessControlError,
     AccessControlGuard,
@@ -49,6 +51,7 @@ from pal_found_cli.common.log_setup import LogSetup
 from pal_found_cli.common.output_formatter import OutputFormatter
 from pal_found_cli.common.pagination_helper import PaginationBoundaryError, PaginationHelper
 from pal_found_cli.common.retry import RetryHandler
+from pal_found_cli.common.timeout_config import resolve_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -916,11 +919,11 @@ def _kebab(name: str) -> str:
     return name.replace("_", "-")
 
 
-def _common_parser() -> _RequiredInputParser:
+def _common_parser() -> _ArgumentParser:
     """Build shared parser for global options."""
-    common = _RequiredInputParser(add_help=False)
+    common = _ArgumentParser(add_help=False)
     common.add_argument("--timeout", type=int, default=None)
-    common.add_argument("--format", choices=["json", "toon", "auto"], default="auto")
+    common.add_argument("--format", choices=["json", "toon", "auto"], default=None)
     common.add_argument("--pretty", action="store_true")
     common.add_argument("--page-size", type=int, default=None, dest="page_size")
     common.add_argument("--page-token", type=str, default=None, dest="page_token")
@@ -934,19 +937,9 @@ def _common_parser() -> _RequiredInputParser:
     return common
 
 
-class _RequiredInputParser(argparse.ArgumentParser):
-    """Report missing required flags through the CLI input-error taxonomy."""
-
-    def error(self, message: str) -> NoReturn:
-        if message.startswith("the following arguments are required:") and "--" in message:
-            ErrorSerializer().serialize(ValueError(message))
-            self.exit(EXIT_USER_INPUT)
-        super().error(message)
-
-
 def build_parser() -> argparse.ArgumentParser:
     """Build argparse parser with all 67 ontology operations."""
-    parser = argparse.ArgumentParser(
+    parser = _ArgumentParser(
         prog="pal_found_ontologies_cli",
         description="Foundry Ontologies CLI - 67 operations",
     )
@@ -955,7 +948,7 @@ def build_parser() -> argparse.ArgumentParser:
     for resource in sorted(OPERATION_BY_RESOURCE):
         res_parser = subparsers.add_parser(_kebab(resource))
         op_sub = res_parser.add_subparsers(
-            dest="operation", parser_class=_RequiredInputParser
+            dest="operation", parser_class=_ArgumentParser
         )
         for operation, spec in sorted(OPERATION_BY_RESOURCE[resource].items()):
             op_parser = op_sub.add_parser(_kebab(operation), parents=[_common_parser()])
@@ -1244,12 +1237,12 @@ async def _invoke_paginated(
 async def main() -> int:
     """Run the Foundry Ontologies CLI."""
     parser = build_parser()
-    args = parser.parse_args()
-    if not args.resource:
-        parser.print_help()
-        return EXIT_USER_INPUT
-    if not getattr(args, "operation", None):
-        parser.print_help()
+    try:
+        args = parser.parse_args()
+        if not args.resource or not getattr(args, "operation", None):
+            raise CLIInputError("An operation is required")
+    except CLIInputError as exc:
+        ErrorSerializer().serialize(exc)
         return EXIT_USER_INPUT
 
     cfg = ConfigLoader()
@@ -1276,10 +1269,10 @@ async def main() -> int:
 
     factory = AsyncClientFactory()
     try:
+        timeout = resolve_timeout(args.timeout, default=cfg.timeout_s)
         with factory.invocation_scope(cfg):
             client = _get_client(cfg, resource, factory)
-            timeout = getattr(args, "timeout", None) or getattr(cfg, "timeout_s", None)
-            retry_handler = RetryHandler()
+            retry_handler = RetryHandler(timeout_s=timeout)
             helper: PaginationHelper | None = None
             if _is_paginated(resource, operation):
                 helper = PaginationHelper(
@@ -1309,7 +1302,7 @@ async def main() -> int:
                     cfg,
                 )
         formatter = OutputFormatter(
-            format_setting=getattr(args, "format", "auto"),
+            format_setting=getattr(args, "format", None),
             pretty=getattr(args, "pretty", False),
         )
         print(formatter.format(_model_to_dict(result)))

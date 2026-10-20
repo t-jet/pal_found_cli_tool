@@ -10,6 +10,7 @@ Run: pytest tests/unit_test_common_components.py -v --tb=long
 
 import os
 import sys
+from contextvars import ContextVar
 from enum import Enum
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -77,6 +78,7 @@ def mock_sdk():
     mock_module = MagicMock()
     mock_module.UserTokenAuth = mock_uta
     mock_module.AsyncFoundryClient = mock_fc
+    mock_module.ATTRIBUTION_VAR = ContextVar("test_attribution", default=None)
 
     with patch.dict(sys.modules, {"foundry_sdk": mock_module}):
         yield mock_module, mock_uta, mock_fc
@@ -184,6 +186,10 @@ class TestConfigLoaderGitRoot:
         d = tmp_path / "no_git"
         d.mkdir()
         monkeypatch.chdir(d)
+        path_exists = Path.exists
+        monkeypatch.setattr(
+            Path, "exists", lambda path: False if path.name == ".git" else path_exists(path)
+        )
         cfg = ConfigLoader()
         result = cfg._find_git_root()
         assert result is None
@@ -732,7 +738,14 @@ class TestAuthProviderGetAuth:
 
     def test_get_auth_import_error_raises_configuration_error(self):
         """When foundry_sdk raises ImportError, ConfigurationError is raised."""
-        with patch.dict(sys.modules, {}):
+        real_import = __import__
+
+        def import_without_sdk(name, *args, **kwargs):
+            if name == "foundry_sdk":
+                raise ImportError("simulated SDK import failure")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=import_without_sdk):
             with pytest.raises(ConfigurationError, match="foundry-sdk not installed"):
                 AuthProvider.get_auth("token")
 
@@ -889,7 +902,7 @@ class TestAsyncClientFactoryAttribution:
     """AsyncClientFactory.create() — attribution header injection."""
 
     def test_create_with_attribution_enabled(self, clean_env, monkeypatch, mock_sdk):
-        """ENABLE_ATTRIBUTION=true + attribution_rids → passes list to client."""
+        """Enabled attribution reaches the SDK context variable."""
         monkeypatch.setenv(ENV_TOKEN, "tok")
         monkeypatch.setenv(ENV_HOSTNAME, "https://host")
         monkeypatch.setenv(ENV_ENABLE_ATTRIBUTION, "true")
@@ -900,8 +913,8 @@ class TestAsyncClientFactoryAttribution:
         factory = AsyncClientFactory()
         factory.create(cfg)
         call_kwargs = mock_fc.call_args[1]
-        assert "attribution_rids" in call_kwargs
-        assert call_kwargs["attribution_rids"] == ["rid1", "rid2", "rid3"]
+        assert "attribution_rids" not in call_kwargs
+        assert mock_mod.ATTRIBUTION_VAR.get() == ["rid1", "rid2", "rid3"]
 
     def test_create_with_attribution_disabled(self, clean_env, monkeypatch, mock_sdk):
         """ENABLE_ATTRIBUTION=false → no attribution_rids in kwargs."""
@@ -912,10 +925,12 @@ class TestAsyncClientFactoryAttribution:
         cfg = ConfigLoader()
         cfg.load()
         mock_mod, mock_uta, mock_fc = mock_sdk
+        mock_mod.ATTRIBUTION_VAR.set(["stale-rid"])
         factory = AsyncClientFactory()
         factory.create(cfg)
         call_kwargs = mock_fc.call_args[1]
         assert "attribution_rids" not in call_kwargs
+        assert mock_mod.ATTRIBUTION_VAR.get() is None
 
     def test_create_attribution_enabled_but_no_rids(
         self, clean_env, monkeypatch, mock_sdk
@@ -928,10 +943,12 @@ class TestAsyncClientFactoryAttribution:
         cfg = ConfigLoader()
         cfg.load()
         mock_mod, mock_uta, mock_fc = mock_sdk
+        mock_mod.ATTRIBUTION_VAR.set(["stale-rid"])
         factory = AsyncClientFactory()
         factory.create(cfg)
         call_kwargs = mock_fc.call_args[1]
         assert "attribution_rids" not in call_kwargs
+        assert mock_mod.ATTRIBUTION_VAR.get() is None
 
     def test_create_attribution_rids_single_value(
         self, clean_env, monkeypatch, mock_sdk
@@ -947,7 +964,8 @@ class TestAsyncClientFactoryAttribution:
         factory = AsyncClientFactory()
         factory.create(cfg)
         call_kwargs = mock_fc.call_args[1]
-        assert call_kwargs["attribution_rids"] == ["single-rid"]
+        assert "attribution_rids" not in call_kwargs
+        assert mock_mod.ATTRIBUTION_VAR.get() == ["single-rid"]
 
     def test_create_attribution_rids_strips_whitespace(
         self, clean_env, monkeypatch, mock_sdk
@@ -963,7 +981,8 @@ class TestAsyncClientFactoryAttribution:
         factory = AsyncClientFactory()
         factory.create(cfg)
         call_kwargs = mock_fc.call_args[1]
-        assert call_kwargs["attribution_rids"] == ["rid1", "rid2", "rid3"]
+        assert "attribution_rids" not in call_kwargs
+        assert mock_mod.ATTRIBUTION_VAR.get() == ["rid1", "rid2", "rid3"]
 
 
 class TestAsyncClientFactoryStatelessness:

@@ -24,6 +24,8 @@ import logging
 import sys
 from typing import Any, cast
 
+from pal_found_cli.common.cli_parser import ArgumentParser as _ArgumentParser  # noqa: E402
+from pal_found_cli.common.cli_parser import CLIInputError  # noqa: E402
 from pal_found_cli.common.access_control_guard import (
     AccessControlError,
     AccessControlGuard,
@@ -50,6 +52,7 @@ from pal_found_cli.common.log_setup import LogSetup
 from pal_found_cli.common.output_formatter import OutputFormatter
 from pal_found_cli.common.pagination_helper import PaginationHelper
 from pal_found_cli.common.retry import RetryHandler
+from pal_found_cli.common.timeout_config import resolve_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -511,9 +514,9 @@ def _common_parser(*, paginated: bool = True) -> argparse.ArgumentParser:
     Every leaf operation subparser inherits these arguments via ``parents``,
     so options like ``--timeout`` may appear after the operation positional.
     """
-    common = argparse.ArgumentParser(add_help=False)
+    common = _ArgumentParser(add_help=False)
     common.add_argument("--timeout", type=int, default=None)
-    common.add_argument("--format", choices=["json", "toon", "auto"], default="auto")
+    common.add_argument("--format", choices=["json", "toon", "auto"], default=None)
     common.add_argument("--pretty", action="store_true")
     if paginated:
         common.add_argument("--page-size", type=int, default=None, dest="page_size")
@@ -538,7 +541,7 @@ def _add_operation(
 
 def build_parser() -> argparse.ArgumentParser:
     """Build argparse parser with all 33 operations."""
-    parser = argparse.ArgumentParser(
+    parser = _ArgumentParser(
         prog="pal_found_datasets_cli",
         description="Foundry Datasets CLI - 33 operations across 5 resource clients",
     )
@@ -743,18 +746,14 @@ def build_parser() -> argparse.ArgumentParser:
 async def async_main() -> int:
     """Main entry point: async, returns exit code."""
     parser = build_parser()
-    args = parser.parse_args()
-
-    if not args.resource:
-        parser.print_help()
+    try:
+        args = parser.parse_args()
+        if not args.resource or not getattr(args, "operation", None):
+            raise CLIInputError("An operation is required")
+    except CLIInputError as exc:
+        ErrorSerializer().serialize(exc)
         return EXIT_USER_INPUT
 
-    # WARNING-3 fix: validate operation is provided
-    if not getattr(args, "operation", None):
-        parser.print_help()
-        return EXIT_USER_INPUT
-
-    # Load configuration (ADR-006)
     cfg = ConfigLoader()
     cfg.load()
 
@@ -778,6 +777,12 @@ async def async_main() -> int:
         serializer.serialize(exc)
         return EXIT_ACCESS_CONTROL
 
+    try:
+        timeout = resolve_timeout(args.timeout, default=cfg.timeout_s)
+    except ValueError as exc:
+        ErrorSerializer().serialize(exc)
+        return EXIT_USER_INPUT
+
     # Create SDK client
     try:
         client = _get_client(cfg, resource)
@@ -789,10 +794,9 @@ async def async_main() -> int:
 
     # WARNING-2 fix: resolve timeout from CLI flag or config default.
     # cfg.timeout_s is the project-wide default (ADR-002). CLI flag wins.
-    timeout = getattr(args, "timeout", None) or getattr(cfg, "timeout_s", None)
 
     # WARNING-1 fix: apply RetryHandler for transient error recovery (ADR-002).
-    retry_handler = RetryHandler()
+    retry_handler = RetryHandler(timeout_s=timeout)
 
     # Build PaginationHelper when the operation is paginated (FR-PAG).
     # --page-size / --page-token / --batch-pages are parsed by _common_parser.
@@ -829,7 +833,7 @@ async def async_main() -> int:
                 _invoke, resource, operation, client, args, timeout
             )
         formatter = OutputFormatter(
-            format_setting=getattr(args, "format", "auto"),
+            format_setting=getattr(args, "format", None),
             pretty=getattr(args, "pretty", False),
         )
         output = formatter.format(_model_to_dict(result))

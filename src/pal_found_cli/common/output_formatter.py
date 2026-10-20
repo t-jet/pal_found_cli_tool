@@ -21,6 +21,8 @@ import os
 import sys
 from typing import Any
 
+import toon_format
+
 # Environment variable for default format
 ENV_DEFAULT_FORMAT = "FOUNDRY_AGENTIC_CLI_DEFAULT_FORMAT"
 
@@ -127,54 +129,19 @@ class OutputFormatter:
             return json.dumps(data, indent=2, default=str)
         return json.dumps(data, default=str)
 
+    @staticmethod
+    def _is_uniform_array(data: Any) -> bool:
+        """Return whether data is a nonempty array of dictionaries with equal keys."""
+        return (
+            isinstance(data, list)
+            and bool(data)
+            and isinstance(data[0], dict)
+            and all(isinstance(item, dict) and item.keys() == data[0].keys() for item in data)
+        )
+
     def _format_toon(self, data: list[dict[str, Any]]) -> str:
-        """Format data as TOON (tabular output).
-
-        TOON format: human-readable table/line format.
-        Each dict item becomes a row with aligned columns.
-
-        Parameters
-        ----------
-        data : List[Dict[str, Any]]
-            List of uniform dicts to format as table.
-
-        Returns
-        -------
-        str
-            TOON-formatted string.
-        """
-        if not data:
-            return ""
-
-        # Extract headers (keys from first item)
-        headers = list(data[0].keys())
-
-        # Calculate column widths
-        col_widths = {h: len(str(h)) for h in headers}
-        for row in data:
-            for h in headers:
-                val_len = len(str(row.get(h, "")))
-                col_widths[h] = max(col_widths[h], val_len)
-
-        # Build table
-        lines = []
-
-        # Header line
-        header_line = "  ".join(str(h).ljust(col_widths[h]) for h in headers)
-        lines.append(header_line)
-
-        # Separator
-        separator = "  ".join("-" * col_widths[h] for h in headers)
-        lines.append(separator)
-
-        # Data rows
-        for row in data:
-            row_line = "  ".join(
-                str(row.get(h, "")).ljust(col_widths[h]) for h in headers
-            )
-            lines.append(row_line)
-
-        return "\n".join(lines)
+        """Encode validated uniform arrays with the approved TOON library."""
+        return toon_format.dumps(data)
 
     def format(self, data: Any) -> str:
         """Format data according to format setting and ADR-004 algorithm.
@@ -203,8 +170,12 @@ class OutputFormatter:
         selected_format = self._select_format(data)
 
         if selected_format == "toon":
-            if isinstance(data, list) and data and isinstance(data[0], dict):
-                return self._format_toon(data)
+            if self._is_uniform_array(data):
+                try:
+                    return self._format_toon(data)
+                except Exception:
+                    sys.stderr.write("TOON encoding failed; emitting JSON.\n")
+                    return self._format_json(data)
             # Fallback to JSON if TOON not applicable
             return self._format_json(data)
 

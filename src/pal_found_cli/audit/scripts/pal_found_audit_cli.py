@@ -12,7 +12,7 @@ import sys
 from collections.abc import Iterable
 from datetime import date
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT: str | None = None
@@ -29,6 +29,7 @@ if _PROJECT_ROOT is None:
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+from pal_found_cli.common.cli_parser import ArgumentParser as _ArgumentParser  # noqa: E402
 from pal_found_cli.common.access_control_guard import (  # noqa: E402
     AccessControlError,
     AccessControlGuard,
@@ -49,7 +50,8 @@ from pal_found_cli.common.error_serializer import (  # noqa: E402
 from pal_found_cli.common.log_setup import LogSetup  # noqa: E402
 from pal_found_cli.common.output_formatter import OutputFormatter  # noqa: E402
 from pal_found_cli.common.pagination_helper import PaginationHelper  # noqa: E402
-from pal_found_cli.common.retry import RetryHandler  # noqa: E402
+from pal_found_cli.common.retry import RetryHandler
+from pal_found_cli.common.timeout_config import resolve_timeout  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +60,6 @@ _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
 _METADATA_ALLOWLIST_PATH = Path(__file__).resolve().parents[1] / "metadata-allow-list.md"
 
 
-class _ArgumentParser(argparse.ArgumentParser):
-    """Raise user-input exceptions instead of writing argparse diagnostics."""
-
-    def error(self, message: str) -> NoReturn:
-        raise ValueError(message)
 
 
 def _op(
@@ -112,7 +109,7 @@ def _common_parser(*, paginated: bool) -> _ArgumentParser:
     """Build operation-level common options."""
     parser = _ArgumentParser(add_help=False)
     parser.add_argument("--timeout", type=int, default=None)
-    parser.add_argument("--format", choices=("json", "toon", "auto"), default="auto")
+    parser.add_argument("--format", choices=("json", "toon", "auto"), default=None)
     parser.add_argument("--pretty", action="store_true")
     if paginated:
         parser.add_argument("--page-size", type=int, default=None, dest="page_size")
@@ -336,9 +333,7 @@ async def main() -> int:
             args.end_date = _parse_iso_date(args.end_date, field="end_date")
             _validate_list_cursor(args.start_date, args.page_token)
 
-        timeout = _validate_timeout(
-            args.timeout if args.timeout is not None else cfg.timeout_s
-        )
+        timeout = resolve_timeout(args.timeout, default=cfg.timeout_s)
         AccessControlGuard(
             cfg,
             "AUDIT",

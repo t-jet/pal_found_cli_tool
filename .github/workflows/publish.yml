@@ -101,7 +101,8 @@ jobs:
           # the conda-build plugin in a non-base activated environment, which made
           # `conda build` fail with "invalid choice: 'build'". The conda-build binary
           # is always installed by the package and is version independent.
-          conda-build conda.recipe --output-folder conda-channel
+          conda-build conda.recipe/toon-format --output-folder conda-channel
+          conda-build conda.recipe --output-folder conda-channel --channel "file://$(pwd)/conda-channel"
 
       - name: Publish conda package when channel permission exists
         shell: bash -el {0}

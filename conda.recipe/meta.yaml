@@ -43,6 +43,16 @@ requirements:
     - foundry-platform-sdk >=1.0
     - python-dotenv >=1.0
     - requests >=2.31
+    - toon-format ==1.2.0
+
+test:
+  imports:
+    - pal_found_cli.common.output_formatter
+    - toon_format
+  commands:
+    - pal-found-filesystem --help
+    - >-
+      python -c "import toon_format; from pal_found_cli.common.output_formatter import OutputFormatter; value = [{'name': 'comma,value', 'enabled': True, 'empty': None}]; assert toon_format.loads(OutputFormatter('toon').format(value)) == value"
 
 about:
   home: https://github.com/t-jet/pal_found_cli_tool

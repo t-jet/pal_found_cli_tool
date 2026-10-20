@@ -9,8 +9,10 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any
 
+from pal_found_cli.common.cli_parser import ArgumentParser as _ArgumentParser  # noqa: E402
+from pal_found_cli.common.cli_parser import CLIInputError  # noqa: E402
 from pal_found_cli.common.access_control_guard import AccessControlGuard
 from pal_found_cli.common.async_client_factory import AsyncClientFactory
 from pal_found_cli.common.config_loader import ConfigLoader, ConfigurationError
@@ -30,6 +32,7 @@ from pal_found_cli.common.error_serializer import (
 from pal_found_cli.common.log_setup import LogSetup
 from pal_found_cli.common.output_formatter import OutputFormatter
 from pal_found_cli.common.retry import RetryHandler
+from pal_found_cli.common.timeout_config import resolve_timeout
 from pal_found_cli.common.sdk_error_utils import sdk_exception_exit_code, sdk_http_status
 
 logger = logging.getLogger(__name__)
@@ -37,17 +40,8 @@ OperationSpec = dict[str, Any]
 _METADATA_ALLOWLIST_PATH = Path(__file__).resolve().parents[1] / "metadata-allow-list.md"
 
 
-class _ArgumentParser(argparse.ArgumentParser):
-    """Raise parser failures into the structured error boundary."""
-
-    def error(self, message: str) -> NoReturn:
-        raise CLIInputError("Invalid command input")
 
 
-class CLIInputError(ValueError):
-    """A locally generated input error whose message contains no supplied value."""
-
-    exit_code = EXIT_USER_INPUT
 
 
 OP_SPECS: tuple[OperationSpec, ...] = (
@@ -96,7 +90,7 @@ def _common_parser() -> _ArgumentParser:
     """Create shared operation options."""
     parser = _ArgumentParser(add_help=False)
     parser.add_argument("--timeout", type=int, default=None)
-    parser.add_argument("--format", choices=("json", "toon", "auto"), default="auto")
+    parser.add_argument("--format", choices=("json", "toon", "auto"), default=None)
     parser.add_argument("--pretty", action="store_true")
     return parser
 
@@ -308,7 +302,7 @@ async def main() -> int:
         operation = args.operation.replace("-", "_")
         spec = _spec_for(resource, operation)
         _validate_inputs(spec, args)
-        timeout = _validate_timeout(args.timeout if args.timeout is not None else cfg.timeout_s)
+        timeout = resolve_timeout(args.timeout, default=cfg.timeout_s)
         AccessControlGuard(
             cfg,
             "LANGUAGE_MODELS",
