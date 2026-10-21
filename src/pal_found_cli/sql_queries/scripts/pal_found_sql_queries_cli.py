@@ -374,14 +374,9 @@ async def _download_operation(
     """Stream one bounded Arrow download through BinaryDownloadHandler."""
     method = getattr(getattr(client, "with_streaming_response"), spec["method"])
     positional = [getattr(args, name) for name in spec["positional"]]
-    kwargs: dict[str, Any] = {}
-    for name in spec["optional"]:
-        if name == "output":
-            continue
-        value = getattr(args, name, None)
-        if value is not None:
-            kwargs[name] = value
-    response_context = method(*positional, request_timeout=timeout, **kwargs)
+    kwargs = _build_kwargs(spec, args, timeout)
+    kwargs.pop("output", None)
+    response_context = method(*positional, **kwargs)
     async with response_context as response:
         result = await BinaryDownloadHandler(config=cfg).save(
             response.aiter_bytes(),
