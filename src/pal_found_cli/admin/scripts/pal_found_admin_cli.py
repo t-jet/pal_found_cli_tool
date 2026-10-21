@@ -295,7 +295,7 @@ def _kebab(name: str) -> str:
     return name.replace("_", "-")
 
 
-def _common_parser(*, paginated: bool) -> argparse.ArgumentParser:
+def _common_parser(*, paginated: bool) -> _ArgumentParser:
     """Build shared parser for operation-level common options."""
     common = _ArgumentParser(add_help=False)
     common.add_argument("--timeout", type=int, default=None)
