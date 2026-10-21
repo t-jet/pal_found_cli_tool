@@ -144,7 +144,8 @@ def test_operation_help_exits_zero(spec, capsys):
 @pytest.mark.asyncio
 async def test_invoke_dispatches_every_canonical_operation(spec):
     client = MagicMock()
-    method = AsyncMock(return_value={"ok": True})
+    result = b"" if spec["operation"] == "streaming_execute" else {"ok": True}
+    method = AsyncMock(return_value=result)
     setattr(client, spec["method"], method)
     args = _args_for(spec)
 

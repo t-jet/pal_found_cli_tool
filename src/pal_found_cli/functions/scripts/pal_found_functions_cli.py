@@ -303,7 +303,22 @@ async def _invoke(
             kwargs[name] = _coerce_arg(value, json_arg=name in spec["json_args"])
 
     kwargs["request_timeout"] = timeout
-    return await _resolve_result(method(*positional, **kwargs))
+    result = await _resolve_result(method(*positional, **kwargs))
+    if (resource, operation) != ("query", "streaming_execute"):
+        return result
+    if isinstance(result, bytes):
+        return result
+
+    # Consume the SDK's typed SSE response inside the retry and client scopes.
+    # Buffer each attempt so a failed stream cannot publish duplicate records.
+    lines = []
+    async with result as response:
+        async for event in response:
+            lines.append(
+                json.dumps(_model_to_dict(event.data), ensure_ascii=False, separators=(",", ":"))
+                + "\n"
+            )
+    return "".join(lines).encode("utf-8")
 
 
 async def main() -> int:
@@ -354,8 +369,8 @@ async def main() -> int:
                 timeout,
             )
         if (resource, operation) == ("query", "streaming_execute"):
-            # The SDK returns UTF-8 NDJSON. Preserve data and error lines as
-            # returned; JSON/TOON formatting would turn the bytes into a count.
+            # Streaming payloads are buffered as UTF-8 NDJSON by _invoke.
+            # Preserve data and error records without JSON/TOON reformatting.
             sys.stdout.write(result.decode("utf-8"))
             return EXIT_SUCCESS
         formatter = OutputFormatter(
