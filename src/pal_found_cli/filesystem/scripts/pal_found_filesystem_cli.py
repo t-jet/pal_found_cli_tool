@@ -516,7 +516,10 @@ async def _invoke(
     """Invoke a filesystem SDK operation."""
     spec = _spec_for(resource, operation)
     method = getattr(client, spec["method"])
-    positional = [getattr(args, name) for name in spec["positional"]]
+    positional = [
+        _coerce_arg(getattr(args, name), json_arg=name in spec["json_args"])
+        for name in spec["positional"]
+    ]
     kwargs: dict[str, Any] = {}
 
     for name in (*spec["required"], *spec["optional"]):
