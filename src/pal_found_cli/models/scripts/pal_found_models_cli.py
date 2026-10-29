@@ -32,6 +32,7 @@ import asyncio
 import json
 import logging
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -487,7 +488,41 @@ async def _invoke(
 ) -> Any:
     """Invoke one non-paginated, non-downloaded SDK operation."""
     positional = [getattr(args, name) for name in spec["positional"]]
-    return await getattr(client, spec["method"])(*positional, **_build_kwargs(spec, args, timeout))
+    if (spec["resource"], spec["operation"]) == ("model_studio_config_version", "get"):
+        return await _get_config_version(client, positional, timeout)
+    return await getattr(client, spec["method"])(
+        *positional, **_build_kwargs(spec, args, timeout)
+    )
+
+
+async def _get_config_version(client: Any, positional: list[Any], timeout: int) -> Any:
+    """Keep SDK validation and decoding while normalizing its integer URL path.
+
+    SDK 1.101 and 1.111 validate this argument as int, then pass the int to
+    urllib.parse.quote, which accepts only str or bytes. Adapt only the
+    generated GET request before the SDK transport serializes its URL.
+    """
+    api_client = client._api_client
+
+    class _PathAdapter:
+        def call_api(self, request_info: Any) -> Any:
+            if request_info.resource_path != (
+                "/v2/models/modelStudios/{modelStudioRid}/configVersions/"
+                "{modelStudioConfigVersionVersion}"
+            ):
+                raise RuntimeError("Unexpected Model Studio config-version route")
+            params = dict(request_info.path_params)
+            version = params["modelStudioConfigVersionVersion"]
+            if isinstance(version, bool) or not isinstance(version, int):
+                raise TypeError("Model Studio config version must be an integer")
+            params["modelStudioConfigVersionVersion"] = str(version)
+            return api_client.call_api(replace(request_info, path_params=params))
+
+    try:
+        client._api_client = _PathAdapter()
+        return await client.get(*positional, request_timeout=timeout)
+    finally:
+        client._api_client = api_client
 
 
 async def _fetch_raw_page(
