@@ -128,11 +128,10 @@ def _root() -> tuple[Any, dict[str, AsyncMock]]:
         undeploy=tracked("website_undeploy"),
         Version=version,
     )
-    third_party_application = SimpleNamespace(get=tracked("tpa_get"))
+    third_party_application = SimpleNamespace(get=tracked("tpa_get"), Website=website)
     root = SimpleNamespace(
         third_party_applications=SimpleNamespace(
             ThirdPartyApplication=third_party_application,
-            Website=website,
         )
     )
     return root, calls
@@ -143,7 +142,9 @@ def _paged_root(pages: list[tuple[list[Any], str | None]]) -> tuple[Any, _RawLis
     version = SimpleNamespace(with_raw_response=SimpleNamespace(list=raw))
     website = SimpleNamespace(Version=version)
     root = SimpleNamespace(
-        third_party_applications=SimpleNamespace(Website=website)
+        third_party_applications=SimpleNamespace(
+            ThirdPartyApplication=SimpleNamespace(Website=website)
+        )
     )
     return root, raw
 
@@ -172,14 +173,14 @@ def test_catalog_contains_exact_9_operations() -> None:
         )
     assert seen == [
         ("third_party_application", "get", ("ThirdPartyApplication",), "get"),
-        ("version", "delete", ("Website", "Version"), "delete"),
-        ("version", "get", ("Website", "Version"), "get"),
-        ("version", "list", ("Website", "Version"), "list"),
-        ("version", "upload", ("Website", "Version"), "upload"),
-        ("version", "upload_snapshot", ("Website", "Version"), "upload_snapshot"),
-        ("website", "deploy", ("Website",), "deploy"),
-        ("website", "get", ("Website",), "get"),
-        ("website", "undeploy", ("Website",), "undeploy"),
+        ("version", "delete", ("ThirdPartyApplication", "Website", "Version"), "delete"),
+        ("version", "get", ("ThirdPartyApplication", "Website", "Version"), "get"),
+        ("version", "list", ("ThirdPartyApplication", "Website", "Version"), "list"),
+        ("version", "upload", ("ThirdPartyApplication", "Website", "Version"), "upload"),
+        ("version", "upload_snapshot", ("ThirdPartyApplication", "Website", "Version"), "upload_snapshot"),
+        ("website", "deploy", ("ThirdPartyApplication", "Website"), "deploy"),
+        ("website", "get", ("ThirdPartyApplication", "Website"), "get"),
+        ("website", "undeploy", ("ThirdPartyApplication", "Website"), "undeploy"),
     ]
 
 
