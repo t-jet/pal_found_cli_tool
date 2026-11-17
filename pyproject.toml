@@ -8,9 +8,9 @@ dynamic = ["version"]
 description = "Foundry CLI - 33 operations across 5 resource clients"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT"
-license-files = ["LICENSE"]
-# Classifiers must be consistent with the `license = "MIT"` expression above and
+license = "MIT AND Apache-2.0"
+license-files = ["LICENSE", "LICENSE.foundry-sdk"]
+# Classifiers must be consistent with the license expression above and
 # the `requires-python` floor (3.11). Twine check enforces this consistency.
 classifiers = [
     "Programming Language :: Python :: 3",

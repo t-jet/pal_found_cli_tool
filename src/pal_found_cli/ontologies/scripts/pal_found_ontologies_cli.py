@@ -1075,7 +1075,15 @@ async def _invoke(
 ) -> Any:
     """Invoke an ontology SDK operation."""
     spec = _spec_for(resource, operation)
-    method = getattr(client, spec["method"])
+    if resource == "geotemporal_series_property" and operation in {
+        "get_geotemporal_series_latest_value",
+        "stream_geotemporal_series_historic_values",
+    }:
+        from pal_found_cli.ontologies._geotemporal_compat import resolve_method
+
+        method = resolve_method(client, spec["method"])
+    else:
+        method = getattr(client, spec["method"])
     positional = [getattr(args, name) for name in spec["positional"]]
     kwargs: dict[str, Any] = {}
 
