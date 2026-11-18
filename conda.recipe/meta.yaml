@@ -60,5 +60,8 @@ test:
 
 about:
   home: https://github.com/t-jet/pal_found_cli_tool
-  license: MIT
+  license: MIT AND Apache-2.0
+  license_file:
+    - LICENSE
+    - LICENSE.foundry-sdk
   summary: Command-line access to Palantir Foundry resource operations

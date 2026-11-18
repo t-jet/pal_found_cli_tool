@@ -1,0 +1,19 @@
+# BUG-051 proposal: activate only after independent risk/security approval.
+# Restricted by scripts/check_safety.py to fresh GitHub-hosted Ubuntu CI,
+# Safety 3.8.1, filelock 3.32.7, no product dependency, and --cache 0.
+# Vulnerabilities remain present. Remove earlier when supported patched Safety ships.
+SFTY-20261017-72390:
+  reason: >-
+    BUG-051: scanner-only filelock 3.32.7 from Safety 3.8.1; Windows ACL
+    advisory CVE-2026-112910. Reviewed Ubuntu/cache0 context only.
+  expires: "2026-12-02"
+SFTY-20261017-54654:
+  reason: >-
+    BUG-051: scanner-only filelock 3.32.7 from Safety 3.8.1; strict soft-lock
+    directory advisory CVE-2026-112908. Reviewed Ubuntu/cache0 context only.
+  expires: "2026-12-02"
+SFTY-20261017-57659:
+  reason: >-
+    BUG-051: scanner-only filelock 3.32.7 from Safety 3.8.1; strict-lock
+    symlink advisory CVE-2026-112938. Reviewed Ubuntu/cache0 context only.
+  expires: "2026-12-02"
