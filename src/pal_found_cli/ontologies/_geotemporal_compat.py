@@ -25,7 +25,7 @@ does not implement the retained contracts. The private _api_client dependency
 is deliberately confined here and covered by native SDK wire tests.
 """
 
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional, cast
 
 import pydantic
 from foundry_sdk import _core as core
@@ -46,10 +46,12 @@ def resolve_method(client: Any, operation: str) -> Callable[..., Any]:
     """Return the native method, falling back only for the two retained names."""
     method = getattr(client, operation, None)
     if method is not None:
-        return method
+        return cast(Callable[..., Any], method)
     if operation not in _OPERATIONS:
         raise AttributeError(f"SDK resource has no operation {operation!r}")
-    return getattr(_LegacyGeotemporalClient(client._api_client), operation)
+    return cast(
+        Callable[..., Any], getattr(_LegacyGeotemporalClient(client._api_client), operation)
+    )
 
 
 class _LegacyGeotemporalClient:
@@ -70,7 +72,7 @@ class _LegacyGeotemporalClient:
         sdk_version: Optional[legacy.SdkVersion] = None,
         request_timeout: Optional[core.Timeout] = None,
     ) -> Awaitable[Optional[legacy.GeotemporalSeriesEntry]]:
-        return self._api_client.call_api(
+        response = self._api_client.call_api(
             core.RequestInfo(
                 method="GET",
                 resource_path=_PREFIX + "latestValue",
@@ -91,6 +93,7 @@ class _LegacyGeotemporalClient:
                 throwable_errors={},
             )
         )
+        return cast(Awaitable[Optional[legacy.GeotemporalSeriesEntry]], response)
 
     @core.maybe_ignore_preview
     @pydantic.validate_call
@@ -107,7 +110,7 @@ class _LegacyGeotemporalClient:
         sdk_version: Optional[legacy.SdkVersion] = None,
         request_timeout: Optional[core.Timeout] = None,
     ) -> Awaitable[bytes]:
-        return self._api_client.call_api(
+        response = self._api_client.call_api(
             core.RequestInfo(
                 method="POST",
                 resource_path=_PREFIX + "streamHistoricValues",
@@ -128,3 +131,4 @@ class _LegacyGeotemporalClient:
                 throwable_errors={},
             )
         )
+        return cast(Awaitable[bytes], response)
