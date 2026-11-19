@@ -131,4 +131,9 @@ jobs:
             exit 1
           fi
           conda install --yes anaconda-client
-          anaconda -t "$ANACONDA_API_TOKEN" upload --user t-jet conda-channel/*/*.conda
+          helper=conda-channel/noarch/toon-format-1.2.0-py_0.conda
+          package="conda-channel/noarch/pal_found_cli-${GITHUB_REF_NAME#v}-py_0.conda"
+          test -f "$helper"
+          test -f "$package"
+          anaconda -t "$ANACONDA_API_TOKEN" upload --user t-jet "$helper"
+          anaconda -t "$ANACONDA_API_TOKEN" upload --user t-jet "$package"

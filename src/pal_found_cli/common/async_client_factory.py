@@ -9,11 +9,11 @@ each ``create()`` returns a fresh client. This keeps tests isolated,
 avoids shared mutable state, and matches the CLI's per-command lifecycle.
 """
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional, cast
 from urllib.parse import urlsplit
-from urllib.request import getproxies_environment, proxy_bypass_environment
+from urllib import request
 
 from pal_found_cli.common.config_loader import ConfigLoader, ConfigurationError
 from pal_found_cli.common.tracing_provider import B3Context, TracingProvider
@@ -95,11 +95,18 @@ class AsyncClientFactory:
         # The SDK supplies its own httpx transport, so httpx does not discover
         # proxy environment variables for us. Match Python's environment proxy
         # precedence and bypass rules for the Foundry hostname.
-        proxies = getproxies_environment()
+        proxies = request.getproxies_environment()
         target = urlsplit(f"https://{hostname.split('://', 1)[-1].strip('/')}")
-        if not proxy_bypass_environment(target.netloc, proxies):
-            sdk_proxies: dict[str, str] = {}
-            for scheme in ("http", "https"):
+        # typeshed omits this public stdlib helper; the cast preserves its
+        # runtime behavior and lets us pass the same environment proxy map.
+        bypass = cast(
+            Callable[[str, dict[str, str]], bool],
+            getattr(request, "proxy_bypass_environment"),
+        )
+        if not bypass(target.netloc, proxies):
+            sdk_proxies: dict[Literal["http", "https"], str] = {}
+            schemes: tuple[Literal["http", "https"], ...] = ("http", "https")
+            for scheme in schemes:
                 proxy_url = proxies.get(scheme) or proxies.get("all")
                 if not proxy_url:
                     continue
