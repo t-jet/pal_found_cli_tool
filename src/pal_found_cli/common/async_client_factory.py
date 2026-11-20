@@ -9,9 +9,11 @@ each ``create()`` returns a fresh client. This keeps tests isolated,
 avoids shared mutable state, and matches the CLI's per-command lifecycle.
 """
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional, cast
+from urllib.parse import urlsplit
+from urllib import request
 
 from pal_found_cli.common.config_loader import ConfigLoader, ConfigurationError
 from pal_found_cli.common.tracing_provider import B3Context, TracingProvider
@@ -89,6 +91,44 @@ class AsyncClientFactory:
             "hostname": hostname,
             "preview": True,
         }
+
+        # The SDK supplies its own httpx transport, so httpx does not discover
+        # proxy environment variables for us. Match Python's environment proxy
+        # precedence and bypass rules for the Foundry hostname.
+        proxies = request.getproxies_environment()
+        target = urlsplit(f"https://{hostname.split('://', 1)[-1].strip('/')}")
+        # typeshed omits this public stdlib helper; the cast preserves its
+        # runtime behavior and lets us pass the same environment proxy map.
+        bypass = cast(
+            Callable[[str, dict[str, str]], bool],
+            getattr(request, "proxy_bypass_environment"),
+        )
+        if not bypass(target.netloc, proxies):
+            sdk_proxies: dict[Literal["http", "https"], str] = {}
+            schemes: tuple[Literal["http", "https"], ...] = ("http", "https")
+            for scheme in schemes:
+                proxy_url = proxies.get(scheme) or proxies.get("all")
+                if not proxy_url:
+                    continue
+                if "://" not in proxy_url:
+                    proxy_url = f"http://{proxy_url}"
+                try:
+                    parsed_proxy = urlsplit(proxy_url)
+                    parsed_proxy.port  # Reject malformed port without requiring one.
+                    valid = (
+                        parsed_proxy.scheme in {"http", "https"}
+                        and parsed_proxy.hostname is not None
+                        and not any(char in proxy_url for char in "\r\n\t")
+                    )
+                except ValueError:
+                    valid = False
+                if not valid:
+                    raise ConfigurationError(f"Invalid {scheme.upper()} proxy URL in environment.")
+                sdk_proxies[scheme] = proxy_url
+            if sdk_proxies:
+                from foundry_sdk import Config
+
+                client_kwargs["config"] = Config(proxies=sdk_proxies)
 
         # SDK reads attribution from a context variable when sending requests.
         # Always set it here so disabled or empty config clears prior values.

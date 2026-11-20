@@ -52,6 +52,25 @@ file is searched per ADR-006 (explicit path override via
 format, access guards, retry, pagination, and tracing; see `.env.example` for
 the full list.
 
+### Network proxies
+
+Set `HTTPS_PROXY` for the HTTPS Foundry endpoint. `HTTP_PROXY` applies to HTTP
+requests. Lowercase `https_proxy` and `http_proxy` take precedence when both
+forms are set. `ALL_PROXY` (or `all_proxy`) supplies a fallback for either
+scheme. Proxy URLs may use `http://` or `https://`; a bare host and port uses
+`http://`. In CGI environments, Python ignores uppercase `HTTP_PROXY`.
+The CLI passes these settings to the SDK transport for each invocation.
+
+Use `NO_PROXY` or `no_proxy` to bypass the proxy for the configured Foundry
+hostname. Lowercase takes precedence. The comma-separated list follows
+Python's `urllib.request.proxy_bypass_environment` rules: `*` bypasses all
+hosts; an exact host, a leading-dot domain, a host with port, or an exact IP
+address can match. Domain matches respect label boundaries, so `example.com`
+matches `api.example.com` but not `badexample.com`. CIDR ranges are not
+supported. Bypass is decided for the configured Foundry hostname when the
+client is created; requests redirected to a different hostname retain that
+client's proxy choice. Keep proxy credentials out of command output and logs.
+
 Then verify the setup:
 
 ```bash

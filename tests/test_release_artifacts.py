@@ -27,7 +27,23 @@ def test_conda_recipe_aligns_name_and_tag_version():
     assert "pal-found-datasets" in text
 
 
-def test_conda_upload_glob_targets_conda_artifact_format():
+def test_conda_publication_requires_credential_and_uploads_new_artifacts_in_order():
     text = (ROOT / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
-    assert "anaconda -t \"$ANACONDA_API_TOKEN\" upload --user t-jet conda-channel/*/*.conda --force" in text
-    assert "conda-channel/*/*.tar.bz2" not in text
+    preflight = text.split("  preflight:", 1)[1].split("  release:", 1)[0]
+    release = text.split("  release:", 1)[1].split("  conda:", 1)[0]
+    conda = text.split("  conda:", 1)[1]
+    upload = conda.split("- name: Publish conda package", 1)[1]
+
+    assert "ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}" in preflight
+    assert "exit 1" in preflight
+    assert "needs: preflight" in release
+    assert "needs: [preflight, release]" in conda
+    assert 'test -f "$helper"' in upload
+    assert 'test -f "$package"' in upload
+    assert "toon-format-1.2.0-py_0.conda" in upload
+    assert 'pal_found_cli-${GITHUB_REF_NAME#v}-py_0.conda' in upload
+    assert upload.index('upload --user t-jet "$helper"') < upload.index(
+        'upload --user t-jet "$package"'
+    )
+    assert "exit 1" in upload
+    assert "--force" not in upload

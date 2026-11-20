@@ -348,6 +348,7 @@ def test_create_opt_out_does_not_overwrite_scoped_none(
     sdk = SimpleNamespace(
         ATTRIBUTION_VAR=attribution,
         AsyncFoundryClient=MagicMock(return_value=client),
+        Config=MagicMock(),
         UserTokenAuth=MagicMock(return_value=object()),
     )
     monkeypatch.setitem(sys.modules, "foundry_sdk", sdk)
